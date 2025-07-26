@@ -3,27 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Gestión de Comidas - Residencia</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://apis.google.com/js/api.js"></script>
+    <script src="config.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
             <h1><i class="fas fa-utensils"></i> Gestión de Comidas</h1>
             <p>Sistema de administración de comidas para residencia</p>
-            <div class="header-controls">
-                <button id="loadDataBtn" class="btn-primary">
-                    <i class="fas fa-sync"></i> Cargar Datos
-                </button>
-                <button id="saveDataBtn" class="btn-success" disabled>
-                    <i class="fas fa-save"></i> Guardar en Google Sheets
-                </button>
-                <div class="date-info">
-                    <span id="currentDate"></span>
+                            <div class="header-controls">
+                    <button id="loadDataBtn" class="btn-primary">
+                        <i class="fas fa-sync"></i> Cargar Datos
+                    </button>
+                    <button id="saveDataBtn" class="btn-success" disabled>
+                        <i class="fas fa-save"></i> Guardar en Google Sheets
+                    </button>
+                    <a href="config.html" class="btn-secondary">
+                        <i class="fas fa-cog"></i> Configuración
+                    </a>
+                    <div class="date-info">
+                        <span id="currentDate"></span>
+                    </div>
                 </div>
-            </div>
         </header>
 
         <div class="main-content">
@@ -56,38 +63,7 @@
                 </div>
             </section>
 
-            <!-- Sección de configuración -->
-            <section class="config-section">
-                <h2><i class="fas fa-cog"></i> Configuración</h2>
-                <div class="config-grid">
-                    <div class="config-item">
-                        <label for="googleSheetId">ID de Google Sheet:</label>
-                        <input type="text" id="googleSheetId" placeholder="Ingresa el ID de tu Google Sheet">
-                    </div>
-                    <div class="config-item">
-                        <label for="sheetName">Nombre de la hoja:</label>
-                        <input type="text" id="sheetName" value="Comidas" placeholder="Nombre de la hoja">
-                    </div>
-                    <div class="config-item">
-                        <label for="apiKey">API Key (opcional):</label>
-                        <input type="text" id="apiKey" placeholder="Tu Google API Key">
-                    </div>
-                    <div class="config-item">
-                        <label for="clientId">Client ID (opcional):</label>
-                        <input type="text" id="clientId" placeholder="Tu Google Client ID">
-                    </div>
-                    <div class="config-item">
-                        <button id="testConnectionBtn" class="btn-secondary">
-                            <i class="fas fa-link"></i> Probar Conexión
-                        </button>
-                    </div>
-                    <div class="config-item">
-                        <button id="previewSheetBtn" class="btn-secondary">
-                            <i class="fas fa-eye"></i> Vista Previa
-                        </button>
-                    </div>
-                </div>
-            </section>
+
         </div>
     </div>
 
@@ -113,6 +89,6 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=2"></script>
 </body>
 </html> 

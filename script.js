@@ -5,11 +5,14 @@ class MealManager {
         this.options = [];
         this.selectedPerson = null;
         this.mealsData = {};
-        this.googleSheetsId = '';
-        this.sheetName = 'Comidas';
-        this.apiKey = '';
-        this.clientId = '';
-        this.daysToGenerate = 60;
+        
+        // Cargar configuración desde config.js
+        this.config = window.LIMOS_CONFIG || {};
+        this.googleSheetsId = this.config.googleSheetsId || '';
+        this.sheetName = this.config.sheetName || 'Comidas';
+        this.apiKey = this.config.apiKey || '';
+        this.clientId = this.config.clientId || '';
+        this.daysToGenerate = this.config.daysToGenerate || 60;
         
         this.init();
     }
@@ -19,7 +22,6 @@ class MealManager {
         this.updateCurrentDate();
         await this.loadInitials();
         await this.loadOptions();
-        this.loadConfig();
         this.renderInitials();
     }
 
@@ -38,20 +40,7 @@ class MealManager {
             this.saveConfig();
         });
 
-        document.getElementById('sheetName').addEventListener('input', (e) => {
-            this.sheetName = e.target.value;
-            this.saveConfig();
-        });
 
-        document.getElementById('apiKey').addEventListener('input', (e) => {
-            this.apiKey = e.target.value;
-            this.saveConfig();
-        });
-
-        document.getElementById('clientId').addEventListener('input', (e) => {
-            this.clientId = e.target.value;
-            this.saveConfig();
-        });
 
         // Modales
         document.getElementById('confirmYes').addEventListener('click', () => this.handleConfirm());
@@ -568,31 +557,7 @@ class MealManager {
         }
     }
 
-    loadConfig() {
-        const savedConfig = localStorage.getItem('mealManagerConfig');
-        if (savedConfig) {
-            const config = JSON.parse(savedConfig);
-            this.googleSheetsId = config.googleSheetsId || '';
-            this.sheetName = config.sheetName || 'Comidas';
-            this.apiKey = config.apiKey || '';
-            this.clientId = config.clientId || '';
-            
-            document.getElementById('googleSheetId').value = this.googleSheetsId;
-            document.getElementById('sheetName').value = this.sheetName;
-            document.getElementById('apiKey').value = this.apiKey;
-            document.getElementById('clientId').value = this.clientId;
-        }
-    }
 
-    saveConfig() {
-        const config = {
-            googleSheetsId: this.googleSheetsId,
-            sheetName: this.sheetName,
-            apiKey: this.apiKey,
-            clientId: this.clientId
-        };
-        localStorage.setItem('mealManagerConfig', JSON.stringify(config));
-    }
 
     // Métodos de UI
     showLoading(message = 'Cargando...') {

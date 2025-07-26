@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Configuración - Gestión de Comidas</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://apis.google.com/js/api.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-cog"></i> Configuración</h1>
+            <p>Configuración de Google Sheets para la aplicación de gestión de comidas</p>
+            <div class="header-controls">
+                <a href="index.html" class="btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Volver a la aplicación
+                </a>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Formulario de configuración -->
+            <section class="config-section">
+                <h2><i class="fas fa-google"></i> Configuración de Google Sheets</h2>
+                
+                <form id="configForm">
+                    <div class="config-grid">
+                        <div class="config-item">
+                            <label for="googleSheetsId">ID del Google Sheet:</label>
+                            <input type="text" id="googleSheetsId" placeholder="Ej: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms" required>
+                            <small>Encuentra el ID en la URL de tu Google Sheet</small>
+                        </div>
+                        
+                        <div class="config-item">
+                            <label for="sheetName">Nombre de la hoja:</label>
+                            <input type="text" id="sheetName" value="Comidas" placeholder="Nombre de la hoja" required>
+                            <small>Nombre de la pestaña dentro del Google Sheet</small>
+                        </div>
+                        
+                        <div class="config-item">
+                            <label for="apiKey">API Key:</label>
+                            <input type="text" id="apiKey" placeholder="Tu Google API Key" required>
+                            <small>Obtén tu API Key en Google Cloud Console</small>
+                        </div>
+                        
+                        <div class="config-item">
+                            <label for="clientId">Client ID:</label>
+                            <input type="text" id="clientId" placeholder="Tu Google Client ID" required>
+                            <small>Obtén tu Client ID en Google Cloud Console</small>
+                        </div>
+                    </div>
+
+                    <div class="config-actions">
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-save"></i> Guardar Configuración
+                        </button>
+                        <button type="button" id="testConfigBtn" class="btn-secondary">
+                            <i class="fas fa-link"></i> Probar Conexión
+                        </button>
+                        <button type="button" id="resetConfigBtn" class="btn-secondary">
+                            <i class="fas fa-undo"></i> Restablecer
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Instrucciones -->
+            <section class="instructions-section">
+                <h2><i class="fas fa-info-circle"></i> Instrucciones de Configuración</h2>
+                
+                <div class="instructions-grid">
+                    <div class="instruction-item">
+                        <h3><i class="fas fa-1"></i> Crear proyecto en Google Cloud Console</h3>
+                        <ol>
+                            <li>Ve a <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a></li>
+                            <li>Crea un nuevo proyecto o selecciona uno existente</li>
+                            <li>Habilita la "Google Sheets API"</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="instruction-item">
+                        <h3><i class="fas fa-2"></i> Obtener credenciales</h3>
+                        <ol>
+                            <li>Ve a "APIs y servicios" → "Credenciales"</li>
+                            <li>Crea credenciales OAuth 2.0</li>
+                            <li>Configura orígenes autorizados: <code>https://limos-app.github.io</code></li>
+                            <li>Copia el API Key y Client ID</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="instruction-item">
+                        <h3><i class="fas fa-3"></i> Obtener ID del Google Sheet</h3>
+                        <ol>
+                            <li>Abre tu Google Sheet</li>
+                            <li>Copia el ID de la URL: <code>https://docs.google.com/spreadsheets/d/<strong>ID_AQUI</strong>/edit</code></li>
+                            <li>Comparte el sheet con tu email con permisos de "Editor"</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="instruction-item">
+                        <h3><i class="fas fa-4"></i> Configurar la aplicación</h3>
+                        <ol>
+                            <li>Completa todos los campos del formulario</li>
+                            <li>Haz clic en "Probar Conexión"</li>
+                            <li>Si funciona, haz clic en "Guardar Configuración"</li>
+                        </ol>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Estado de la configuración -->
+            <section class="status-section">
+                <h2><i class="fas fa-check-circle"></i> Estado de la Configuración</h2>
+                <div id="configStatus" class="status-grid">
+                    <div class="status-item">
+                        <span class="status-label">Google Sheets ID:</span>
+                        <span id="statusSheetsId" class="status-value">No configurado</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">API Key:</span>
+                        <span id="statusApiKey" class="status-value">No configurado</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Client ID:</span>
+                        <span id="statusClientId" class="status-value">No configurado</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Conexión:</span>
+                        <span id="statusConnection" class="status-value">No probada</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Modal de carga -->
+    <div id="loadingModal" class="modal">
+        <div class="modal-content">
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin"></i>
+            </div>
+            <p id="loadingMessage">Procesando...</p>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <h3 id="confirmTitle">Confirmar acción</h3>
+            <p id="confirmMessage">¿Estás seguro de que quieres realizar esta acción?</p>
+            <div class="modal-actions">
+                <button id="confirmYes" class="btn-success">Sí, confirmar</button>
+                <button id="confirmNo" class="btn-secondary">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="config-manager.js"></script>
+</body>
+</html> 
