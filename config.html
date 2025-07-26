@@ -49,9 +49,14 @@
                         </div>
                         
                         <div class="config-item">
-                            <label for="clientId">Client ID:</label>
-                            <input type="text" id="clientId" placeholder="Tu Google Client ID" required>
-                            <small>Obtén tu Client ID en Google Cloud Console</small>
+                            <label for="clientId">Client ID (OAuth) o Service Account Email:</label>
+                            <input type="text" id="clientId" placeholder="Tu Google Client ID o Service Account Email">
+                            <small>Para OAuth: Client ID. Para Service Account: Email de la cuenta de servicio</small>
+                        </div>
+                        <div class="config-item">
+                            <label for="serviceAccountKey">Service Account Key (JSON):</label>
+                            <textarea id="serviceAccountKey" placeholder='Pega aquí el contenido del archivo JSON de la Service Account' rows="5"></textarea>
+                            <small>Opcional: Si usas Service Account, pega aquí el contenido del archivo JSON</small>
                         </div>
                     </div>
 
@@ -84,7 +89,7 @@
                     </div>
                     
                     <div class="instruction-item">
-                        <h3><i class="fas fa-2"></i> Obtener credenciales</h3>
+                        <h3><i class="fas fa-2"></i> Obtener credenciales (OAuth 2.0)</h3>
                         <ol>
                             <li>Ve a "APIs y servicios" → "Credenciales"</li>
                             <li>Crea credenciales OAuth 2.0</li>
@@ -94,11 +99,22 @@
                     </div>
                     
                     <div class="instruction-item">
+                        <h3><i class="fas fa-2"></i> Obtener credenciales (Service Account)</h3>
+                        <ol>
+                            <li>Ve a "APIs y servicios" → "Credenciales"</li>
+                            <li>Crea "Cuenta de servicio"</li>
+                            <li>Descarga el archivo JSON de la clave</li>
+                            <li>Copia el email de la Service Account</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="instruction-item">
                         <h3><i class="fas fa-3"></i> Obtener ID del Google Sheet</h3>
                         <ol>
                             <li>Abre tu Google Sheet</li>
                             <li>Copia el ID de la URL: <code>https://docs.google.com/spreadsheets/d/<strong>ID_AQUI</strong>/edit</code></li>
-                            <li>Comparte el sheet con tu email con permisos de "Editor"</li>
+                            <li><strong>OAuth 2.0:</strong> Comparte con tu email personal</li>
+                            <li><strong>Service Account:</strong> Comparte con el email de la Service Account</li>
                         </ol>
                     </div>
                     
