@@ -26,25 +26,57 @@ class MealManager {
     }
 
     setupEventListeners() {
-        // Botones principales
-        document.getElementById('loadDataBtn').addEventListener('click', () => this.loadData());
-        document.getElementById('saveDataBtn').addEventListener('click', () => this.saveToGoogleSheets());
-        document.getElementById('saveMealsBtn').addEventListener('click', () => this.saveMeals());
-        document.getElementById('clearMealsBtn').addEventListener('click', () => this.clearMeals());
-        document.getElementById('testConnectionBtn').addEventListener('click', () => this.testGoogleSheetsConnection());
-        document.getElementById('previewSheetBtn').addEventListener('click', () => this.showSheetPreview());
+        // Botones principales - solo agregar si existen
+        const loadDataBtn = document.getElementById('loadDataBtn');
+        if (loadDataBtn) {
+            loadDataBtn.addEventListener('click', () => this.loadData());
+        }
 
-        // Configuración
-        document.getElementById('googleSheetId').addEventListener('input', (e) => {
-            this.googleSheetsId = e.target.value;
-            this.saveConfig();
-        });
+        const saveDataBtn = document.getElementById('saveDataBtn');
+        if (saveDataBtn) {
+            saveDataBtn.addEventListener('click', () => this.saveToGoogleSheets());
+        }
 
+        const saveMealsBtn = document.getElementById('saveMealsBtn');
+        if (saveMealsBtn) {
+            saveMealsBtn.addEventListener('click', () => this.saveMeals());
+        }
 
+        const clearMealsBtn = document.getElementById('clearMealsBtn');
+        if (clearMealsBtn) {
+            clearMealsBtn.addEventListener('click', () => this.clearMeals());
+        }
 
-        // Modales
-        document.getElementById('confirmYes').addEventListener('click', () => this.handleConfirm());
-        document.getElementById('confirmNo').addEventListener('click', () => this.hideConfirmModal());
+        // Botones opcionales - solo agregar si existen
+        const testConnectionBtn = document.getElementById('testConnectionBtn');
+        if (testConnectionBtn) {
+            testConnectionBtn.addEventListener('click', () => this.testGoogleSheetsConnection());
+        }
+
+        const previewSheetBtn = document.getElementById('previewSheetBtn');
+        if (previewSheetBtn) {
+            previewSheetBtn.addEventListener('click', () => this.showSheetPreview());
+        }
+
+        // Configuración - solo agregar si existe
+        const googleSheetId = document.getElementById('googleSheetId');
+        if (googleSheetId) {
+            googleSheetId.addEventListener('input', (e) => {
+                this.googleSheetsId = e.target.value;
+                this.saveConfig();
+            });
+        }
+
+        // Modales - solo agregar si existen
+        const confirmYes = document.getElementById('confirmYes');
+        if (confirmYes) {
+            confirmYes.addEventListener('click', () => this.handleConfirm());
+        }
+
+        const confirmNo = document.getElementById('confirmNo');
+        if (confirmNo) {
+            confirmNo.addEventListener('click', () => this.hideConfirmModal());
+        }
     }
 
     updateCurrentDate() {
