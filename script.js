@@ -7,6 +7,8 @@ class MealManager {
         this.mealsData = {};
         this.googleSheetsId = '';
         this.sheetName = 'Comidas';
+        this.apiKey = '';
+        this.clientId = '';
         this.daysToGenerate = 60;
         
         this.init();
@@ -28,6 +30,7 @@ class MealManager {
         document.getElementById('saveMealsBtn').addEventListener('click', () => this.saveMeals());
         document.getElementById('clearMealsBtn').addEventListener('click', () => this.clearMeals());
         document.getElementById('testConnectionBtn').addEventListener('click', () => this.testGoogleSheetsConnection());
+        document.getElementById('previewSheetBtn').addEventListener('click', () => this.showSheetPreview());
 
         // Configuración
         document.getElementById('googleSheetId').addEventListener('input', (e) => {
@@ -37,6 +40,16 @@ class MealManager {
 
         document.getElementById('sheetName').addEventListener('input', (e) => {
             this.sheetName = e.target.value;
+            this.saveConfig();
+        });
+
+        document.getElementById('apiKey').addEventListener('input', (e) => {
+            this.apiKey = e.target.value;
+            this.saveConfig();
+        });
+
+        document.getElementById('clientId').addEventListener('input', (e) => {
+            this.clientId = e.target.value;
             this.saveConfig();
         });
 
@@ -139,12 +152,16 @@ class MealManager {
         this.initials.forEach(person => {
             const button = document.createElement('button');
             button.className = 'initial-btn';
-            button.innerHTML = `
-                ${person.initials}
-                ${person.phone ? `<span class="phone">${person.phone}</span>` : ''}
-            `;
+            button.textContent = person.initials;
             
-            button.addEventListener('click', () => this.selectPerson(person));
+            button.addEventListener('click', () => {
+                // Si el botón ya está seleccionado, deseleccionarlo
+                if (button.classList.contains('selected')) {
+                    this.deselectPerson();
+                } else {
+                    this.selectPerson(person);
+                }
+            });
             container.appendChild(button);
         });
     }
@@ -169,6 +186,23 @@ class MealManager {
         
         // Habilitar botón de guardar
         document.getElementById('saveMealsBtn').disabled = false;
+    }
+
+    deselectPerson() {
+        // Deseleccionar todos los botones
+        document.querySelectorAll('.initial-btn').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+
+        this.selectedPerson = null;
+        document.getElementById('selectedPersonName').textContent = 'Selecciona un comensal';
+        
+        // Ocultar sección de comidas
+        document.getElementById('mealsSection').style.display = 'none';
+        
+        // Deshabilitar botones
+        document.getElementById('saveMealsBtn').disabled = true;
+        document.getElementById('saveDataBtn').disabled = true;
     }
 
     generateMeals() {
@@ -276,6 +310,9 @@ class MealManager {
                 document.getElementById('saveMealsBtn').disabled = true;
                 document.getElementById('saveDataBtn').disabled = true;
                 this.showNotification('Selección limpiada', 'success');
+                
+                // Ocultar la sección de comidas
+                document.getElementById('mealsSection').style.display = 'none';
             }
         );
     }
@@ -286,27 +323,143 @@ class MealManager {
             return;
         }
 
+        if (Object.keys(this.mealsData).length === 0) {
+            this.showNotification('No hay datos para guardar', 'error');
+            return;
+        }
+
         try {
             this.showLoading('Guardando en Google Sheets...');
             
-            // Aquí iría la lógica real de Google Sheets
-            // Por ahora simulamos el guardado
-            await this.simulateGoogleSheetsSave();
+            // Preparar datos en el formato correcto para Google Sheets
+            const sheetData = this.prepareSheetData();
+            
+            // Intentar guardar usando la API real
+            await this.saveToGoogleSheetsAPI(sheetData);
             
             this.hideLoading();
             this.showNotification('Datos guardados en Google Sheets correctamente', 'success');
         } catch (error) {
             this.hideLoading();
-            this.showNotification('Error al guardar en Google Sheets', 'error');
+            this.showNotification('Error al guardar en Google Sheets: ' + error.message, 'error');
             console.error('Error saving to Google Sheets:', error);
         }
     }
 
-    async simulateGoogleSheetsSave() {
+    async saveToGoogleSheetsAPI(sheetData) {
+        // Verificar si tenemos las credenciales necesarias
+        if (!this.hasGoogleSheetsCredentials()) {
+            throw new Error('Credenciales de Google Sheets no configuradas');
+        }
+
+        // Inicializar la API de Google
+        await this.initializeGoogleAPI();
+
+        // Preparar los datos para la API
+        const values = [sheetData.headers, ...sheetData.meals];
+        
+        // Actualizar la hoja
+        const response = await gapi.client.sheets.spreadsheets.values.update({
+            spreadsheetId: this.googleSheetsId,
+            range: `${this.sheetName}!A1`,
+            valueInputOption: 'RAW',
+            resource: {
+                values: values
+            }
+        });
+
+        console.log('Respuesta de Google Sheets:', response);
+        return response;
+    }
+
+    hasGoogleSheetsCredentials() {
+        // Verificar si tenemos las credenciales configuradas
+        // En un entorno real, esto verificaría las credenciales OAuth o Service Account
+        return this.googleSheetsId && this.sheetName;
+    }
+
+    async initializeGoogleAPI() {
+        return new Promise((resolve, reject) => {
+            gapi.load('client:auth2', async () => {
+                try {
+                    const initConfig = {
+                        discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
+                        scope: 'https://www.googleapis.com/auth/spreadsheets'
+                    };
+
+                    // Agregar credenciales si están configuradas
+                    if (this.apiKey) {
+                        initConfig.apiKey = this.apiKey;
+                    }
+                    if (this.clientId) {
+                        initConfig.clientId = this.clientId;
+                    }
+
+                    await gapi.client.init(initConfig);
+
+                    // Si tenemos clientId, intentar autenticar
+                    if (this.clientId && gapi.auth2) {
+                        if (!gapi.auth2.getAuthInstance().isSignedIn.get()) {
+                            await gapi.auth2.getAuthInstance().signIn();
+                        }
+                    }
+
+                    resolve();
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        });
+    }
+
+    prepareSheetData() {
+        const sheetData = {
+            headers: ['Fecha', 'Comida'],
+            meals: []
+        };
+
+        // Agregar iniciales como headers (columna C en adelante)
+        this.initials.forEach(person => {
+            sheetData.headers.push(person.initials);
+        });
+
+        // Generar datos de comidas para los próximos 60 días
+        const today = new Date();
+        
+        for (let i = 0; i < this.daysToGenerate; i++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() + i);
+            const dateStr = date.toISOString().split('T')[0];
+            
+            // Fila para Almuerzo
+            const almuerzoRow = [dateStr, 'A'];
+            this.initials.forEach(person => {
+                const mealData = this.mealsData[person.initials]?.[dateStr]?.almuerzo || '';
+                almuerzoRow.push(mealData);
+            });
+            sheetData.meals.push(almuerzoRow);
+            
+            // Fila para Cena
+            const cenaRow = [dateStr, 'C'];
+            this.initials.forEach(person => {
+                const mealData = this.mealsData[person.initials]?.[dateStr]?.cena || '';
+                cenaRow.push(mealData);
+            });
+            sheetData.meals.push(cenaRow);
+        }
+
+        return sheetData;
+    }
+
+    async simulateGoogleSheetsSave(sheetData) {
         // Simulación de guardado en Google Sheets
         return new Promise((resolve) => {
             setTimeout(() => {
-                console.log('Datos a guardar:', this.mealsData);
+                console.log('Estructura del Google Sheet:');
+                console.log('Headers:', sheetData.headers);
+                console.log('Primeras 5 filas de comidas:', sheetData.meals.slice(0, 5));
+                console.log('Total de filas:', sheetData.meals.length);
+                console.log('Datos completos:', sheetData);
                 resolve();
             }, 2000);
         });
@@ -331,6 +484,68 @@ class MealManager {
             this.showNotification('Error de conexión con Google Sheets', 'error');
             console.error('Connection test error:', error);
         }
+    }
+
+    showSheetPreview() {
+        if (Object.keys(this.mealsData).length === 0) {
+            this.showNotification('No hay datos para mostrar', 'info');
+            return;
+        }
+
+        const sheetData = this.prepareSheetData();
+        
+        // Crear una tabla de vista previa
+        let previewHTML = `
+            <div style="max-height: 400px; overflow-y: auto; margin: 20px 0;">
+                <h4>Vista previa del Google Sheet:</h4>
+                <table style="border-collapse: collapse; width: 100%; font-size: 12px;">
+                    <thead>
+                        <tr style="background: #f0f0f0;">
+                            ${sheetData.headers.map(header => `<th style="border: 1px solid #ccc; padding: 8px; text-align: center;">${header}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        // Mostrar solo las primeras 10 filas para la vista previa
+        sheetData.meals.slice(0, 10).forEach(row => {
+            previewHTML += '<tr>';
+            row.forEach((cell, index) => {
+                const style = index < 2 ? 'background: #e8f4f8; font-weight: bold;' : '';
+                previewHTML += `<td style="border: 1px solid #ccc; padding: 6px; text-align: center; ${style}">${cell || '-'}</td>`;
+            });
+            previewHTML += '</tr>';
+        });
+
+        previewHTML += `
+                    </tbody>
+                </table>
+                <p style="margin-top: 10px; font-size: 12px; color: #666;">
+                    Mostrando 10 de ${sheetData.meals.length} filas totales
+                </p>
+            </div>
+        `;
+
+        // Mostrar en un modal
+        this.showPreviewModal('Vista previa del Google Sheet', previewHTML);
+    }
+
+    showPreviewModal(title, content) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'block';
+        
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 800px; max-height: 80vh; overflow-y: auto;">
+                <h3>${title}</h3>
+                ${content}
+                <div class="modal-actions">
+                    <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cerrar</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
     }
 
     async simulateConnectionTest() {
@@ -359,16 +574,22 @@ class MealManager {
             const config = JSON.parse(savedConfig);
             this.googleSheetsId = config.googleSheetsId || '';
             this.sheetName = config.sheetName || 'Comidas';
+            this.apiKey = config.apiKey || '';
+            this.clientId = config.clientId || '';
             
             document.getElementById('googleSheetId').value = this.googleSheetsId;
             document.getElementById('sheetName').value = this.sheetName;
+            document.getElementById('apiKey').value = this.apiKey;
+            document.getElementById('clientId').value = this.clientId;
         }
     }
 
     saveConfig() {
         const config = {
             googleSheetsId: this.googleSheetsId,
-            sheetName: this.sheetName
+            sheetName: this.sheetName,
+            apiKey: this.apiKey,
+            clientId: this.clientId
         };
         localStorage.setItem('mealManagerConfig', JSON.stringify(config));
     }
