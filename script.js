@@ -60,12 +60,20 @@ class MealManager {
 
     async loadInitials() {
         try {
+            console.log('Iniciando carga de iniciales...');
             this.showLoading('Cargando iniciales...');
             
             // En un entorno real, esto sería una llamada a un servidor
             // Por ahora, simulamos la carga desde el archivo
             const response = await fetch('iniciales.txt');
+            console.log('Respuesta del fetch:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const text = await response.text();
+            console.log('Texto cargado:', text.substring(0, 100) + '...');
             
             this.initials = text.split('\n')
                 .filter(line => line.trim())
@@ -76,6 +84,9 @@ class MealManager {
                         phone: phone ? phone.trim() : ''
                     };
                 });
+
+            console.log('Iniciales procesadas:', this.initials.length, 'personas');
+            console.log('Primeras iniciales:', this.initials.slice(0, 3));
 
             this.hideLoading();
             this.showNotification('Iniciales cargadas correctamente', 'success');
@@ -135,7 +146,17 @@ class MealManager {
     }
 
     renderInitials() {
+        console.log('Renderizando iniciales...');
+        console.log('Número de iniciales a renderizar:', this.initials.length);
+        
         const container = document.getElementById('initialsContainer');
+        console.log('Container encontrado:', container);
+        
+        if (!container) {
+            console.error('No se encontró el container de iniciales!');
+            return;
+        }
+        
         container.innerHTML = '';
 
         this.initials.forEach(person => {
