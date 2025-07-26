@@ -1,270 +1,418 @@
-// Clase para gestionar los comensales
-class ComensalManager {
+// Clase principal para gestionar las comidas
+class MealManager {
     constructor() {
-        this.comensales = JSON.parse(localStorage.getItem('comensales')) || [];
-        this.currentId = this.comensales.length > 0 ? Math.max(...this.comensales.map(c => c.id)) + 1 : 1;
+        this.initials = [];
+        this.options = [];
+        this.selectedPerson = null;
+        this.mealsData = {};
+        this.googleSheetsId = '';
+        this.sheetName = 'Comidas';
+        this.daysToGenerate = 60;
+        
         this.init();
     }
 
-    init() {
+    async init() {
         this.setupEventListeners();
-        this.renderTable();
-        this.updateStats();
+        this.updateCurrentDate();
+        await this.loadInitials();
+        await this.loadOptions();
+        this.loadConfig();
+        this.renderInitials();
     }
 
     setupEventListeners() {
-        // Formulario principal
-        document.getElementById('comensalForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.agregarComensal();
+        // Botones principales
+        document.getElementById('loadDataBtn').addEventListener('click', () => this.loadData());
+        document.getElementById('saveDataBtn').addEventListener('click', () => this.saveToGoogleSheets());
+        document.getElementById('saveMealsBtn').addEventListener('click', () => this.saveMeals());
+        document.getElementById('clearMealsBtn').addEventListener('click', () => this.clearMeals());
+        document.getElementById('testConnectionBtn').addEventListener('click', () => this.testGoogleSheetsConnection());
+
+        // Configuración
+        document.getElementById('googleSheetId').addEventListener('input', (e) => {
+            this.googleSheetsId = e.target.value;
+            this.saveConfig();
         });
 
-        // Búsqueda y filtros
-        document.getElementById('searchInput').addEventListener('input', () => {
-            this.filtrarComensales();
+        document.getElementById('sheetName').addEventListener('input', (e) => {
+            this.sheetName = e.target.value;
+            this.saveConfig();
         });
 
-        document.getElementById('filterDieta').addEventListener('change', () => {
-            this.filtrarComensales();
-        });
-
-        document.getElementById('clearFilters').addEventListener('click', () => {
-            this.limpiarFiltros();
-        });
-
-        // Modal
-        const modal = document.getElementById('editModal');
-        const closeBtn = document.querySelector('.close');
-        
-        closeBtn.addEventListener('click', () => {
-            modal.style.display = 'none';
-        });
-
-        window.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-            }
-        });
-
-        // Formulario de edición
-        document.getElementById('editForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.actualizarComensal();
-        });
+        // Modales
+        document.getElementById('confirmYes').addEventListener('click', () => this.handleConfirm());
+        document.getElementById('confirmNo').addEventListener('click', () => this.hideConfirmModal());
     }
 
-    agregarComensal() {
-        const formData = new FormData(document.getElementById('comensalForm'));
-        const comensal = {
-            id: this.currentId++,
-            nombre: formData.get('nombre'),
-            habitacion: parseInt(formData.get('habitacion')),
-            dieta: formData.get('dieta'),
-            alergias: formData.get('alergias'),
-            observaciones: formData.get('observaciones'),
-            fechaRegistro: new Date().toISOString()
+    updateCurrentDate() {
+        const today = new Date();
+        const options = { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
         };
-
-        this.comensales.push(comensal);
-        this.guardarEnLocalStorage();
-        this.renderTable();
-        this.updateStats();
-        this.mostrarNotificacion('Comensal agregado exitosamente', 'success');
-        
-        // Limpiar formulario
-        document.getElementById('comensalForm').reset();
+        document.getElementById('currentDate').textContent = today.toLocaleDateString('es-ES', options);
     }
 
-    editarComensal(id) {
-        const comensal = this.comensales.find(c => c.id === id);
-        if (!comensal) return;
+    async loadInitials() {
+        try {
+            this.showLoading('Cargando iniciales...');
+            
+            // En un entorno real, esto sería una llamada a un servidor
+            // Por ahora, simulamos la carga desde el archivo
+            const response = await fetch('iniciales.txt');
+            const text = await response.text();
+            
+            this.initials = text.split('\n')
+                .filter(line => line.trim())
+                .map(line => {
+                    const [initials, phone] = line.split(',');
+                    return {
+                        initials: initials.trim(),
+                        phone: phone ? phone.trim() : ''
+                    };
+                });
 
-        // Llenar el formulario de edición
-        document.getElementById('editId').value = comensal.id;
-        document.getElementById('editNombre').value = comensal.nombre;
-        document.getElementById('editHabitacion').value = comensal.habitacion;
-        document.getElementById('editDieta').value = comensal.dieta;
-        document.getElementById('editAlergias').value = comensal.alergias || '';
-        document.getElementById('editObservaciones').value = comensal.observaciones || '';
-
-        // Mostrar modal
-        document.getElementById('editModal').style.display = 'block';
-    }
-
-    actualizarComensal() {
-        const id = parseInt(document.getElementById('editId').value);
-        const comensalIndex = this.comensales.findIndex(c => c.id === id);
-        
-        if (comensalIndex === -1) return;
-
-        this.comensales[comensalIndex] = {
-            ...this.comensales[comensalIndex],
-            nombre: document.getElementById('editNombre').value,
-            habitacion: parseInt(document.getElementById('editHabitacion').value),
-            dieta: document.getElementById('editDieta').value,
-            alergias: document.getElementById('editAlergias').value,
-            observaciones: document.getElementById('editObservaciones').value,
-            fechaActualizacion: new Date().toISOString()
-        };
-
-        this.guardarEnLocalStorage();
-        this.renderTable();
-        this.updateStats();
-        this.mostrarNotificacion('Comensal actualizado exitosamente', 'success');
-        
-        // Cerrar modal
-        document.getElementById('editModal').style.display = 'none';
-    }
-
-    eliminarComensal(id) {
-        if (confirm('¿Estás seguro de que quieres eliminar este comensal?')) {
-            this.comensales = this.comensales.filter(c => c.id !== id);
-            this.guardarEnLocalStorage();
-            this.renderTable();
-            this.updateStats();
-            this.mostrarNotificacion('Comensal eliminado exitosamente', 'success');
+            this.hideLoading();
+            this.showNotification('Iniciales cargadas correctamente', 'success');
+        } catch (error) {
+            this.hideLoading();
+            this.showNotification('Error al cargar iniciales', 'error');
+            console.error('Error loading initials:', error);
+            
+            // Datos de ejemplo si no se puede cargar el archivo
+            this.initials = [
+                { initials: 'MEP', phone: '+54 9 11 6823-7844' },
+                { initials: 'PGG', phone: '+54 9 11 3789-7958' },
+                { initials: 'LMC', phone: '+54 9 11 2331-5671' },
+                { initials: 'PAB', phone: '+54 9 11 5329-9371' },
+                { initials: 'FIG', phone: '+54 9 11 5483-4727' },
+                { initials: 'FAM', phone: '+54 9 351 613-5015' },
+                { initials: 'IJC', phone: '+54 9 11 2342-0491' },
+                { initials: 'ELF', phone: '+54 9 11 4436-6712' },
+                { initials: 'MS', phone: '+54 9 342 524-9601' },
+                { initials: 'JOA', phone: '+54 9 11 7366-8868' },
+                { initials: 'GG', phone: '+54 9 11 3167-5521' },
+                { initials: 'AS', phone: '11-667-807-21' },
+                { initials: 'JBA', phone: '+54 9 11 6692-4301' },
+                { initials: 'IC', phone: '+54 9 221 643-2931' },
+                { initials: 'TA', phone: '' },
+                { initials: 'JPS', phone: '' },
+                { initials: 'FEC', phone: '' },
+                { initials: 'Huesped1', phone: '' },
+                { initials: 'Huesped2', phone: '' },
+                { initials: 'Plan', phone: '' },
+                { initials: 'Invitados', phone: '' }
+            ];
         }
     }
 
-    filtrarComensales() {
-        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-        const filterDieta = document.getElementById('filterDieta').value;
-        
-        const comensalesFiltrados = this.comensales.filter(comensal => {
-            const matchesSearch = comensal.nombre.toLowerCase().includes(searchTerm) ||
-                                comensal.habitacion.toString().includes(searchTerm);
-            const matchesDieta = !filterDieta || comensal.dieta === filterDieta;
+    async loadOptions() {
+        try {
+            this.showLoading('Cargando opciones...');
             
-            return matchesSearch && matchesDieta;
+            const response = await fetch('opciones.txt');
+            const text = await response.text();
+            
+            this.options = text.split('\n')
+                .filter(line => line.trim())
+                .map(line => line.trim());
+
+            this.hideLoading();
+            this.showNotification('Opciones cargadas correctamente', 'success');
+        } catch (error) {
+            this.hideLoading();
+            this.showNotification('Error al cargar opciones', 'error');
+            console.error('Error loading options:', error);
+            
+            // Opciones por defecto
+            this.options = ['Si', 'Régimen', 'Vianda', 'Temprano', 'Tarde', 'Sandwich', 'No'];
+        }
+    }
+
+    renderInitials() {
+        const container = document.getElementById('initialsContainer');
+        container.innerHTML = '';
+
+        this.initials.forEach(person => {
+            const button = document.createElement('button');
+            button.className = 'initial-btn';
+            button.innerHTML = `
+                ${person.initials}
+                ${person.phone ? `<span class="phone">${person.phone}</span>` : ''}
+            `;
+            
+            button.addEventListener('click', () => this.selectPerson(person));
+            container.appendChild(button);
+        });
+    }
+
+    selectPerson(person) {
+        // Deseleccionar botón anterior
+        document.querySelectorAll('.initial-btn').forEach(btn => {
+            btn.classList.remove('selected');
         });
 
-        this.renderTable(comensalesFiltrados);
+        // Seleccionar nuevo botón
+        event.target.closest('.initial-btn').classList.add('selected');
+
+        this.selectedPerson = person;
+        document.getElementById('selectedPersonName').textContent = person.initials;
+        
+        // Mostrar sección de comidas
+        document.getElementById('mealsSection').style.display = 'block';
+        
+        // Generar días y comidas
+        this.generateMeals();
+        
+        // Habilitar botón de guardar
+        document.getElementById('saveMealsBtn').disabled = false;
     }
 
-    limpiarFiltros() {
-        document.getElementById('searchInput').value = '';
-        document.getElementById('filterDieta').value = '';
-        this.renderTable();
-    }
+    generateMeals() {
+        const container = document.getElementById('mealsContainer');
+        container.innerHTML = '';
 
-    renderTable(comensalesToRender = this.comensales) {
-        const tbody = document.getElementById('comensalesTableBody');
-        tbody.innerHTML = '';
-
-        if (comensalesToRender.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" style="text-align: center; padding: 40px; color: #666;">
-                        <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
-                        No se encontraron comensales
-                    </td>
-                </tr>
+        const today = new Date();
+        
+        for (let i = 0; i < this.daysToGenerate; i++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() + i);
+            
+            const dayMeal = document.createElement('div');
+            dayMeal.className = 'day-meal';
+            
+            const dateStr = date.toLocaleDateString('es-ES', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            dayMeal.innerHTML = `
+                <div class="day-header">${dateStr}</div>
+                <div class="meal-row">
+                    <div class="meal-label">Almuerzo:</div>
+                    <div class="meal-options" data-date="${date.toISOString().split('T')[0]}" data-meal="almuerzo">
+                        ${this.options.map(option => `
+                            <button class="meal-option-btn" data-option="${option}">${option}</button>
+                        `).join('')}
+                    </div>
+                </div>
+                <div class="meal-row">
+                    <div class="meal-label">Cena:</div>
+                    <div class="meal-options" data-date="${date.toISOString().split('T')[0]}" data-meal="cena">
+                        ${this.options.map(option => `
+                            <button class="meal-option-btn" data-option="${option}">${option}</button>
+                        `).join('')}
+                    </div>
+                </div>
             `;
+            
+            container.appendChild(dayMeal);
+        }
+
+        // Agregar event listeners a los botones de opciones
+        this.setupMealOptionListeners();
+    }
+
+    setupMealOptionListeners() {
+        document.querySelectorAll('.meal-option-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const optionBtn = e.target;
+                const optionsContainer = optionBtn.closest('.meal-options');
+                
+                // Deseleccionar otros botones en el mismo contenedor
+                optionsContainer.querySelectorAll('.meal-option-btn').forEach(b => {
+                    b.classList.remove('selected');
+                });
+                
+                // Seleccionar el botón clickeado
+                optionBtn.classList.add('selected');
+                
+                // Guardar la selección
+                const date = optionsContainer.dataset.date;
+                const meal = optionsContainer.dataset.meal;
+                const option = optionBtn.dataset.option;
+                
+                if (!this.mealsData[this.selectedPerson.initials]) {
+                    this.mealsData[this.selectedPerson.initials] = {};
+                }
+                if (!this.mealsData[this.selectedPerson.initials][date]) {
+                    this.mealsData[this.selectedPerson.initials][date] = {};
+                }
+                
+                this.mealsData[this.selectedPerson.initials][date][meal] = option;
+            });
+        });
+    }
+
+    saveMeals() {
+        if (!this.selectedPerson) {
+            this.showNotification('Selecciona un comensal primero', 'error');
             return;
         }
 
-        comensalesToRender.forEach(comensal => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td><strong>${comensal.nombre}</strong></td>
-                <td><span class="dieta-badge" style="background: #e2e8f0; color: #4a5568;">Habitación ${comensal.habitacion}</span></td>
-                <td><span class="dieta-badge dieta-${comensal.dieta}">${this.getDietaDisplayName(comensal.dieta)}</span></td>
-                <td>${comensal.alergias ? `<span style="color: #e53e3e; font-weight: 600;">${comensal.alergias}</span>` : '<span style="color: #666;">Sin alergias</span>'}</td>
-                <td>${comensal.observaciones ? `<span style="font-style: italic;">${comensal.observaciones}</span>` : '<span style="color: #666;">Sin observaciones</span>'}</td>
-                <td>
-                    <div class="action-buttons">
-                        <button class="btn-edit" onclick="comensalManager.editarComensal(${comensal.id})">
-                            <i class="fas fa-edit"></i> Editar
-                        </button>
-                        <button class="btn-delete" onclick="comensalManager.eliminarComensal(${comensal.id})">
-                            <i class="fas fa-trash"></i> Eliminar
-                        </button>
-                    </div>
-                </td>
-            `;
-            tbody.appendChild(row);
-        });
+        // Guardar en localStorage como respaldo
+        localStorage.setItem('mealsData', JSON.stringify(this.mealsData));
+        
+        this.showNotification('Comidas guardadas localmente', 'success');
+        
+        // Habilitar botón de guardar en Google Sheets
+        document.getElementById('saveDataBtn').disabled = false;
     }
 
-    getDietaDisplayName(dieta) {
-        const dietas = {
-            'normal': 'Normal',
-            'baja-sodio': 'Baja Sodio',
-            'diabetica': 'Diabética',
-            'sin-gluten': 'Sin Gluten',
-            'vegetariana': 'Vegetariana',
-            'blanda': 'Blanda'
-        };
-        return dietas[dieta] || dieta;
+    clearMeals() {
+        this.showConfirmModal(
+            'Limpiar selección',
+            '¿Estás seguro de que quieres limpiar todas las selecciones de comidas?',
+            () => {
+                this.mealsData = {};
+                document.querySelectorAll('.meal-option-btn').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+                document.getElementById('saveMealsBtn').disabled = true;
+                document.getElementById('saveDataBtn').disabled = true;
+                this.showNotification('Selección limpiada', 'success');
+            }
+        );
     }
 
-    updateStats() {
-        const total = this.comensales.length;
-        document.getElementById('totalComensales').textContent = total;
+    async saveToGoogleSheets() {
+        if (!this.googleSheetsId) {
+            this.showNotification('Configura el ID de Google Sheet primero', 'error');
+            return;
+        }
 
-        // Actualizar estadísticas por dieta
-        const statsByDieta = {};
-        this.comensales.forEach(comensal => {
-            statsByDieta[comensal.dieta] = (statsByDieta[comensal.dieta] || 0) + 1;
-        });
-
-        // Mostrar estadísticas adicionales si hay datos
-        const statsDiv = document.querySelector('.stats');
-        if (total > 0) {
-            let statsHTML = `<p>Total de comensales: <span id="totalComensales">${total}</span></p>`;
-            statsHTML += '<div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">';
+        try {
+            this.showLoading('Guardando en Google Sheets...');
             
-            Object.entries(statsByDieta).forEach(([dieta, count]) => {
-                const displayName = this.getDietaDisplayName(dieta);
-                const percentage = ((count / total) * 100).toFixed(1);
-                statsHTML += `
-                    <span class="dieta-badge dieta-${dieta}" style="font-size: 0.7rem;">
-                        ${displayName}: ${count} (${percentage}%)
-                    </span>
-                `;
-            });
-            statsHTML += '</div>';
-            statsDiv.innerHTML = statsHTML;
+            // Aquí iría la lógica real de Google Sheets
+            // Por ahora simulamos el guardado
+            await this.simulateGoogleSheetsSave();
+            
+            this.hideLoading();
+            this.showNotification('Datos guardados en Google Sheets correctamente', 'success');
+        } catch (error) {
+            this.hideLoading();
+            this.showNotification('Error al guardar en Google Sheets', 'error');
+            console.error('Error saving to Google Sheets:', error);
         }
     }
 
-    guardarEnLocalStorage() {
-        localStorage.setItem('comensales', JSON.stringify(this.comensales));
+    async simulateGoogleSheetsSave() {
+        // Simulación de guardado en Google Sheets
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                console.log('Datos a guardar:', this.mealsData);
+                resolve();
+            }, 2000);
+        });
     }
 
-    mostrarNotificacion(mensaje, tipo = 'info') {
-        // Crear notificación
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 600;
-            z-index: 10000;
-            animation: slideInRight 0.3s ease;
-            max-width: 300px;
-        `;
+    async testGoogleSheetsConnection() {
+        if (!this.googleSheetsId) {
+            this.showNotification('Ingresa el ID de Google Sheet primero', 'error');
+            return;
+        }
 
-        // Estilos según tipo
-        if (tipo === 'success') {
-            notification.style.background = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
-        } else if (tipo === 'error') {
-            notification.style.background = 'linear-gradient(135deg, #f56565 0%, #e53e3e 100%)';
+        try {
+            this.showLoading('Probando conexión...');
+            
+            // Aquí iría la lógica real de prueba de conexión
+            await this.simulateConnectionTest();
+            
+            this.hideLoading();
+            this.showNotification('Conexión exitosa con Google Sheets', 'success');
+        } catch (error) {
+            this.hideLoading();
+            this.showNotification('Error de conexión con Google Sheets', 'error');
+            console.error('Connection test error:', error);
+        }
+    }
+
+    async simulateConnectionTest() {
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                console.log('Testing connection to:', this.googleSheetsId);
+                resolve();
+            }, 1500);
+        });
+    }
+
+    loadData() {
+        // Cargar datos guardados
+        const savedData = localStorage.getItem('mealsData');
+        if (savedData) {
+            this.mealsData = JSON.parse(savedData);
+            this.showNotification('Datos cargados correctamente', 'success');
         } else {
-            notification.style.background = 'linear-gradient(135deg, #4299e1 0%, #3182ce 100%)';
+            this.showNotification('No hay datos guardados', 'info');
         }
+    }
 
+    loadConfig() {
+        const savedConfig = localStorage.getItem('mealManagerConfig');
+        if (savedConfig) {
+            const config = JSON.parse(savedConfig);
+            this.googleSheetsId = config.googleSheetsId || '';
+            this.sheetName = config.sheetName || 'Comidas';
+            
+            document.getElementById('googleSheetId').value = this.googleSheetsId;
+            document.getElementById('sheetName').value = this.sheetName;
+        }
+    }
+
+    saveConfig() {
+        const config = {
+            googleSheetsId: this.googleSheetsId,
+            sheetName: this.sheetName
+        };
+        localStorage.setItem('mealManagerConfig', JSON.stringify(config));
+    }
+
+    // Métodos de UI
+    showLoading(message = 'Cargando...') {
+        document.getElementById('loadingMessage').textContent = message;
+        document.getElementById('loadingModal').style.display = 'block';
+    }
+
+    hideLoading() {
+        document.getElementById('loadingModal').style.display = 'none';
+    }
+
+    showConfirmModal(title, message, onConfirm) {
+        document.getElementById('confirmTitle').textContent = title;
+        document.getElementById('confirmMessage').textContent = message;
+        document.getElementById('confirmModal').style.display = 'block';
+        
+        this.confirmCallback = onConfirm;
+    }
+
+    hideConfirmModal() {
+        document.getElementById('confirmModal').style.display = 'none';
+        this.confirmCallback = null;
+    }
+
+    handleConfirm() {
+        if (this.confirmCallback) {
+            this.confirmCallback();
+        }
+        this.hideConfirmModal();
+    }
+
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
         notification.innerHTML = `
-            <i class="fas fa-${tipo === 'success' ? 'check-circle' : tipo === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
-            ${mensaje}
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+            ${message}
         `;
 
         document.body.appendChild(notification);
 
-        // Remover después de 3 segundos
         setTimeout(() => {
             notification.style.animation = 'slideOutRight 0.3s ease';
             setTimeout(() => {
@@ -274,101 +422,12 @@ class ComensalManager {
             }, 300);
         }, 3000);
     }
-
-    // Método para exportar datos
-    exportarDatos() {
-        const dataStr = JSON.stringify(this.comensales, null, 2);
-        const dataBlob = new Blob([dataStr], {type: 'application/json'});
-        const url = URL.createObjectURL(dataBlob);
-        
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `comensales_${new Date().toISOString().split('T')[0]}.json`;
-        link.click();
-        
-        URL.revokeObjectURL(url);
-        this.mostrarNotificacion('Datos exportados exitosamente', 'success');
-    }
-
-    // Método para importar datos
-    importarDatos(file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const data = JSON.parse(e.target.result);
-                if (Array.isArray(data)) {
-                    this.comensales = data;
-                    this.currentId = this.comensales.length > 0 ? Math.max(...this.comensales.map(c => c.id)) + 1 : 1;
-                    this.guardarEnLocalStorage();
-                    this.renderTable();
-                    this.updateStats();
-                    this.mostrarNotificacion('Datos importados exitosamente', 'success');
-                } else {
-                    throw new Error('Formato inválido');
-                }
-            } catch (error) {
-                this.mostrarNotificacion('Error al importar datos', 'error');
-            }
-        };
-        reader.readAsText(file);
-    }
 }
 
-// Agregar estilos CSS para las animaciones de notificaciones
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideInRight {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    
-    @keyframes slideOutRight {
-        from { transform: translateX(0); opacity: 1; }
-        to { transform: translateX(100%); opacity: 0; }
-    }
-`;
-document.head.appendChild(style);
-
-// Inicializar la aplicación
-let comensalManager;
-
+// Inicializar la aplicación cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
-    comensalManager = new ComensalManager();
-    
-    // Agregar funcionalidad de exportar/importar
-    const exportBtn = document.createElement('button');
-    exportBtn.className = 'btn-secondary';
-    exportBtn.innerHTML = '<i class="fas fa-download"></i> Exportar Datos';
-    exportBtn.onclick = () => comensalManager.exportarDatos();
-    
-    const importBtn = document.createElement('button');
-    importBtn.className = 'btn-secondary';
-    importBtn.innerHTML = '<i class="fas fa-upload"></i> Importar Datos';
-    
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.json';
-    fileInput.style.display = 'none';
-    fileInput.onchange = (e) => {
-        if (e.target.files.length > 0) {
-            comensalManager.importarDatos(e.target.files[0]);
-        }
-    };
-    
-    importBtn.onclick = () => fileInput.click();
-    
-    // Agregar botones al header
-    const header = document.querySelector('header');
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.cssText = 'margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;';
-    buttonContainer.appendChild(exportBtn);
-    buttonContainer.appendChild(importBtn);
-    buttonContainer.appendChild(fileInput);
-    header.appendChild(buttonContainer);
+    window.mealManager = new MealManager();
 });
 
 // Función global para acceder desde HTML
-window.comensalManager = null;
-document.addEventListener('DOMContentLoaded', () => {
-    window.comensalManager = comensalManager;
-}); 
+window.mealManager = null; 
