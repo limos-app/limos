@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Comensales - Residencia</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-utensils"></i> Gestión de Comensales</h1>
+            <p>Sistema de administración para residencia</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Formulario para agregar comensales -->
+            <section class="form-section">
+                <h2><i class="fas fa-user-plus"></i> Agregar Comensal</h2>
+                <form id="comensalForm">
+                    <div class="form-group">
+                        <label for="nombre">Nombre completo:</label>
+                        <input type="text" id="nombre" name="nombre" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="habitacion">Número de habitación:</label>
+                        <input type="number" id="habitacion" name="habitacion" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="dieta">Tipo de dieta:</label>
+                        <select id="dieta" name="dieta" required>
+                            <option value="">Seleccionar dieta</option>
+                            <option value="normal">Normal</option>
+                            <option value="baja-sodio">Baja en sodio</option>
+                            <option value="diabetica">Diabética</option>
+                            <option value="sin-gluten">Sin gluten</option>
+                            <option value="vegetariana">Vegetariana</option>
+                            <option value="blanda">Blanda</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="alergias">Alergias (opcional):</label>
+                        <textarea id="alergias" name="alergias" placeholder="Especificar alergias si las hay"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="observaciones">Observaciones:</label>
+                        <textarea id="observaciones" name="observaciones" placeholder="Observaciones adicionales"></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-save"></i> Guardar Comensal
+                    </button>
+                </form>
+            </section>
+
+            <!-- Sección de búsqueda y filtros -->
+            <section class="search-section">
+                <h2><i class="fas fa-search"></i> Buscar Comensales</h2>
+                <div class="search-controls">
+                    <input type="text" id="searchInput" placeholder="Buscar por nombre o habitación...">
+                    <select id="filterDieta">
+                        <option value="">Todas las dietas</option>
+                        <option value="normal">Normal</option>
+                        <option value="baja-sodio">Baja en sodio</option>
+                        <option value="diabetica">Diabética</option>
+                        <option value="sin-gluten">Sin gluten</option>
+                        <option value="vegetariana">Vegetariana</option>
+                        <option value="blanda">Blanda</option>
+                    </select>
+                    <button id="clearFilters" class="btn-secondary">
+                        <i class="fas fa-times"></i> Limpiar filtros
+                    </button>
+                </div>
+            </section>
+
+            <!-- Tabla de comensales -->
+            <section class="table-section">
+                <h2><i class="fas fa-users"></i> Lista de Comensales</h2>
+                <div class="table-container">
+                    <table id="comensalesTable">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Habitación</th>
+                                <th>Dieta</th>
+                                <th>Alergias</th>
+                                <th>Observaciones</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comensalesTableBody">
+                            <!-- Los datos se cargarán dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="stats">
+                    <p>Total de comensales: <span id="totalComensales">0</span></p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Modal para editar comensal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2><i class="fas fa-edit"></i> Editar Comensal</h2>
+            <form id="editForm">
+                <input type="hidden" id="editId">
+                <div class="form-group">
+                    <label for="editNombre">Nombre completo:</label>
+                    <input type="text" id="editNombre" required>
+                </div>
+                <div class="form-group">
+                    <label for="editHabitacion">Número de habitación:</label>
+                    <input type="number" id="editHabitacion" required>
+                </div>
+                <div class="form-group">
+                    <label for="editDieta">Tipo de dieta:</label>
+                    <select id="editDieta" required>
+                        <option value="normal">Normal</option>
+                        <option value="baja-sodio">Baja en sodio</option>
+                        <option value="diabetica">Diabética</option>
+                        <option value="sin-gluten">Sin gluten</option>
+                        <option value="vegetariana">Vegetariana</option>
+                        <option value="blanda">Blanda</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editAlergias">Alergias:</label>
+                    <textarea id="editAlergias"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editObservaciones">Observaciones:</label>
+                    <textarea id="editObservaciones"></textarea>
+                </div>
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-save"></i> Actualizar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
