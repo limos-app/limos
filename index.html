@@ -9,7 +9,6 @@
     <title>Gestión de Comidas - Residencia</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://apis.google.com/js/api.js"></script>
     <script src="config.js"></script>
 </head>
 <body>
@@ -18,18 +17,22 @@
             <h1><i class="fas fa-utensils"></i> Gestión de Comidas</h1>
             <p>Sistema de administración de comidas para residencia</p>
                             <div class="header-controls">
-                    <button id="loadDataBtn" class="btn-primary">
+                    <!-- Guardado automático habilitado; estos botones no son necesarios -->
+                    <!-- <button id="loadDataBtn" class="btn-primary">
                         <i class="fas fa-sync"></i> Cargar Datos
                     </button>
                     <button id="saveDataBtn" class="btn-success" disabled>
-                        <i class="fas fa-save"></i> Guardar en Google Sheets
+                        <i class="fas fa-save"></i> Guardar en servidor
+                    </button> -->
+                    <button id="todayBtn" class="btn-secondary">
+                        <i class="fas fa-calendar-day"></i> Hoy
                     </button>
-                    <a href="config.html" class="btn-secondary">
-                        <i class="fas fa-cog"></i> Configuración
-                    </a>
                     <div class="date-info">
                         <span id="currentDate"></span>
                     </div>
+                    <a href="config.html" class="btn-secondary">
+                        <i class="fas fa-cog"></i> 
+                    </a>
                 </div>
         </header>
 
@@ -45,18 +48,16 @@
             <!-- Sección de comidas -->
             <section id="mealsSection" class="meals-section" style="display: none;">
                 <h2><i class="fas fa-calendar-alt"></i> Planificación de Comidas</h2>
-                <div class="selected-person">
-                    <h3 id="selectedPersonName">Selecciona un comensal</h3>
-                </div>
                 
                 <div id="mealsContainer" class="meals-container">
                     <!-- Los días y comidas se generarán dinámicamente -->
                 </div>
 
                 <div class="meals-actions">
-                    <button id="saveMealsBtn" class="btn-success" disabled>
+                    <!-- Guardado automático; el botón de guardar no es necesario -->
+                    <!-- <button id="saveMealsBtn" class="btn-success" disabled>
                         <i class="fas fa-save"></i> Guardar Comidas
-                    </button>
+                    </button> -->
                     <button id="clearMealsBtn" class="btn-secondary">
                         <i class="fas fa-eraser"></i> Limpiar Selección
                     </button>

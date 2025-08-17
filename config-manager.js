@@ -2,6 +2,7 @@
 class ConfigManager {
     constructor() {
         this.config = window.LIMOS_CONFIG || {};
+        this.selectedInitials = null;
         this.init();
     }
 
@@ -9,6 +10,7 @@ class ConfigManager {
         this.setupEventListeners();
         this.loadCurrentConfig();
         this.updateStatus();
+        this.loadPeople();
     }
 
     setupEventListeners() {
@@ -21,6 +23,12 @@ class ConfigManager {
         // Botones
         document.getElementById('testConfigBtn').addEventListener('click', () => this.testConnection());
         document.getElementById('resetConfigBtn').addEventListener('click', () => this.resetConfig());
+        const createBtn = document.getElementById('personCreateBtn');
+        if (createBtn) createBtn.addEventListener('click', () => this.createPerson());
+        const updateBtn = document.getElementById('personUpdateBtn');
+        if (updateBtn) updateBtn.addEventListener('click', () => this.updatePerson());
+        const deleteBtn = document.getElementById('personDeleteBtn');
+        if (deleteBtn) deleteBtn.addEventListener('click', () => this.deletePerson());
 
         // Modales
         document.getElementById('confirmYes').addEventListener('click', () => this.handleConfirm());
@@ -28,36 +36,28 @@ class ConfigManager {
     }
 
     loadCurrentConfig() {
-        // Cargar configuración actual en los campos
-        document.getElementById('googleSheetsId').value = this.config.googleSheetsId || '';
-        document.getElementById('sheetName').value = this.config.sheetName || 'Comidas';
-        document.getElementById('apiKey').value = this.config.apiKey || '';
-        document.getElementById('clientId').value = this.config.clientId || '';
+        document.getElementById('backendBaseUrl').value = this.config.backendBaseUrl || 'http://localhost:4000';
+        document.getElementById('startDate').value = this.config.startDate || '2025-08-01';
+        document.getElementById('daysToGenerate').value = this.config.daysToGenerate || 120;
+        document.getElementById('maxYears').value = this.config.maxYears || 10;
     }
 
     saveConfig() {
         const newConfig = {
-            googleSheetsId: document.getElementById('googleSheetsId').value.trim(),
-            sheetName: document.getElementById('sheetName').value.trim(),
-            apiKey: document.getElementById('apiKey').value.trim(),
-            clientId: document.getElementById('clientId').value.trim()
+            backendBaseUrl: document.getElementById('backendBaseUrl').value.trim(),
+            startDate: document.getElementById('startDate').value.trim(),
+            daysToGenerate: parseInt(document.getElementById('daysToGenerate').value, 10),
+            maxYears: parseInt(document.getElementById('maxYears').value, 10)
         };
 
-        // Validar campos requeridos
-        if (!newConfig.googleSheetsId || !newConfig.sheetName || !newConfig.apiKey || !newConfig.clientId) {
+        if (!newConfig.backendBaseUrl || !newConfig.startDate || !newConfig.daysToGenerate || !newConfig.maxYears) {
             this.showNotification('Todos los campos son requeridos', 'error');
             return;
         }
 
-        // Actualizar configuración
         this.config = { ...this.config, ...newConfig };
-        
-        // Guardar en localStorage como respaldo
         localStorage.setItem('limosConfig', JSON.stringify(this.config));
-        
-        // Actualizar el archivo config.js (esto requeriría una implementación más compleja)
         this.updateConfigFile();
-        
         this.updateStatus();
         this.showNotification('Configuración guardada correctamente', 'success');
     }
@@ -65,24 +65,14 @@ class ConfigManager {
     async updateConfigFile() {
         try {
             // Crear el contenido del archivo config.js
-            const configContent = `// Configuración de Google Sheets
+            const configContent = `// Configuración de LIMOS (almacenamiento en backend)
 // Este archivo se guarda en GitHub para persistir la configuración
 window.LIMOS_CONFIG = {
-    // ID del Google Sheet (obtener de la URL del sheet)
-    googleSheetsId: '${this.config.googleSheetsId}',
-    
-    // Nombre de la hoja dentro del Google Sheet
-    sheetName: '${this.config.sheetName}',
-    
-    // Credenciales de Google Cloud Console
-    apiKey: '${this.config.apiKey}',
-    clientId: '${this.config.clientId}',
-    
-    // Configuración de la aplicación
-    daysToGenerate: 60,
-    
-    // Versión de la configuración
-    version: '1.0'
+    backendBaseUrl: '${this.config.backendBaseUrl}',
+    startDate: '${this.config.startDate}',
+    daysToGenerate: ${this.config.daysToGenerate},
+    maxYears: ${this.config.maxYears},
+    version: '2.0'
 };
 
 // Función para actualizar la configuración
@@ -104,35 +94,22 @@ window.updateLimosConfig = function(newConfig) {
     }
 
     async testConnection() {
-        const googleSheetsId = document.getElementById('googleSheetsId').value.trim();
-        const apiKey = document.getElementById('apiKey').value.trim();
-
-        if (!googleSheetsId || !apiKey) {
-            this.showNotification('Configura Google Sheets ID y API Key primero', 'error');
+        const baseUrl = document.getElementById('backendBaseUrl').value.trim();
+        if (!baseUrl) {
+            this.showNotification('Configura Backend Base URL primero', 'error');
             return;
         }
-
         try {
-            this.showLoading('Probando conexión con Google Sheets...');
-            
-            // Inicializar la API de Google
-            await this.initializeGoogleAPI();
-            
-            // Intentar leer el sheet para verificar acceso
-            const response = await gapi.client.sheets.spreadsheets.get({
-                spreadsheetId: googleSheetsId
-            });
-
+            this.showLoading('Probando conexión con el backend...');
+            const res = await fetch(baseUrl + '/api/health');
             this.hideLoading();
-            
-            if (response.status === 200) {
-                this.showNotification('Conexión exitosa con Google Sheets', 'success');
+            if (res.ok) {
+                this.showNotification('Conexión exitosa con el backend', 'success');
                 document.getElementById('statusConnection').textContent = 'Conectado';
                 document.getElementById('statusConnection').className = 'status-value success';
             } else {
-                throw new Error('Respuesta inesperada del servidor');
+                throw new Error('El backend respondió con estado ' + res.status);
             }
-            
         } catch (error) {
             this.hideLoading();
             this.showNotification('Error de conexión: ' + error.message, 'error');
@@ -140,22 +117,6 @@ window.updateLimosConfig = function(newConfig) {
             document.getElementById('statusConnection').className = 'status-value error';
             console.error('Connection test error:', error);
         }
-    }
-
-    async initializeGoogleAPI() {
-        return new Promise((resolve, reject) => {
-            gapi.load('client', async () => {
-                try {
-                    await gapi.client.init({
-                        apiKey: document.getElementById('apiKey').value.trim(),
-                        discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4']
-                    });
-                    resolve();
-                } catch (error) {
-                    reject(error);
-                }
-            });
-        });
     }
 
     resetConfig() {
@@ -180,36 +141,131 @@ window.updateLimosConfig = function(newConfig) {
     }
 
     updateStatus() {
-        // Actualizar estado de Google Sheets ID
-        const sheetsIdStatus = document.getElementById('statusSheetsId');
-        if (this.config.googleSheetsId) {
-            sheetsIdStatus.textContent = 'Configurado';
-            sheetsIdStatus.className = 'status-value success';
+        const backendStatus = document.getElementById('statusBackend');
+        if (this.config.backendBaseUrl) {
+            backendStatus.textContent = this.config.backendBaseUrl;
+            backendStatus.className = 'status-value success';
         } else {
-            sheetsIdStatus.textContent = 'No configurado';
-            sheetsIdStatus.className = 'status-value error';
+            backendStatus.textContent = 'No configurado';
+            backendStatus.className = 'status-value error';
         }
 
-        // Actualizar estado de API Key
-        const apiKeyStatus = document.getElementById('statusApiKey');
-        if (this.config.apiKey) {
-            apiKeyStatus.textContent = 'Configurado';
-            apiKeyStatus.className = 'status-value success';
-        } else {
-            apiKeyStatus.textContent = 'No configurado';
-            apiKeyStatus.className = 'status-value error';
-        }
+        document.getElementById('statusStartDate').textContent = this.config.startDate || '-';
+        document.getElementById('statusDays').textContent = String(this.config.daysToGenerate || '-');
+        document.getElementById('statusMaxYears').textContent = String(this.config.maxYears || '-');
+    }
 
-        // Actualizar estado de Client ID
-        const clientIdStatus = document.getElementById('statusClientId');
-        if (this.config.clientId) {
-            clientIdStatus.textContent = 'Configurado';
-            clientIdStatus.className = 'status-value success';
-        } else {
-            clientIdStatus.textContent = 'No configurado';
-            clientIdStatus.className = 'status-value error';
+    // Gestión de comensales
+    async loadPeople() {
+        try {
+            const baseUrl = (this.config.backendBaseUrl || '').trim();
+            if (!baseUrl) return;
+            const res = await fetch(baseUrl + '/api/people');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const people = await res.json();
+            const list = document.getElementById('peopleList');
+            if (!list) return;
+            list.innerHTML = '';
+            people.forEach(p => {
+                const item = document.createElement('div');
+                item.style.display = 'flex';
+                item.style.justifyContent = 'space-between';
+                item.style.alignItems = 'center';
+                item.style.padding = '6px 8px';
+                item.style.borderBottom = '1px solid #eee';
+                const regText = p.hasRegimen ? (p.regimenType ? `(R: ${p.regimenType})` : '(R)') : '';
+                item.innerHTML = `<span><strong>${p.initials}</strong> - ${p.name || ''} ${p.resident ? '(Residente)' : ''} ${regText ? ' ' + regText : ''}</span>`;
+                item.addEventListener('click', () => {
+                    document.getElementById('personInitials').value = p.initials || '';
+                    document.getElementById('personName').value = p.name || '';
+                    document.getElementById('personResident').value = p.resident ? 'true' : 'false';
+                    document.getElementById('personHasRegimen').value = p.hasRegimen ? 'true' : 'false';
+                    document.getElementById('personRegimenType').value = p.regimenType || '';
+                    this.selectedInitials = p.initials || null;
+                    this.selectedPersonId = p.id || null;
+                });
+                list.appendChild(item);
+            });
+        } catch (err) {
+            console.warn('No se pudieron cargar comensales:', err);
         }
     }
+
+    async createPerson() {
+        const baseUrl = (this.config.backendBaseUrl || '').trim();
+        if (!baseUrl) return this.showNotification('Configura Backend Base URL', 'error');
+        const body = {
+            initials: document.getElementById('personInitials').value.trim(),
+            name: document.getElementById('personName').value.trim(),
+            resident: document.getElementById('personResident').value === 'true',
+            regimen: document.getElementById('personRegimen').value.trim()
+        };
+        if (!body.initials || !body.name) return this.showNotification('Iniciales y Nombre son requeridos', 'error');
+        const res = await fetch(baseUrl + '/api/people', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!res.ok) return this.showNotification('Error creando comensal', 'error');
+        this.showNotification('Comensal creado', 'success');
+        this.loadPeople();
+    }
+
+    async updatePerson() {
+        const baseUrl = (this.config.backendBaseUrl || '').trim();
+        if (!baseUrl) return this.showNotification('Configura Backend Base URL', 'error');
+        const currentInputInitials = document.getElementById('personInitials').value.trim();
+        const initialsKey = this.selectedInitials || currentInputInitials;
+        const body = {
+            initials: currentInputInitials,
+            name: document.getElementById('personName').value.trim(),
+            resident: document.getElementById('personResident').value === 'true',
+            hasRegimen: document.getElementById('personHasRegimen').value === 'true',
+            regimenType: document.getElementById('personRegimenType').value.trim()
+        };
+        if (!body.initials || !body.name) return this.showNotification('Iniciales y Nombre son requeridos', 'error');
+        // Preferir actualizar por id si está disponible
+        const endpoint = this.selectedPersonId ? (`/api/people/id/${this.selectedPersonId}`) : (`/api/people/${encodeURIComponent(initialsKey)}`);
+        const res = await fetch(baseUrl + endpoint, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!res.ok) {
+            if (res.status === 404) {
+                // Si no existe, intentamos crearlo automáticamente
+                const createRes = await fetch(baseUrl + '/api/people', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                if (!createRes.ok) {
+                    const txt = await createRes.text().catch(() => '');
+                    return this.showNotification('Error guardando cambios: ' + (txt || 'no se pudo crear'), 'error');
+                }
+            } else {
+                const txt = await res.text().catch(() => '');
+                return this.showNotification('Error guardando cambios' + (txt ? ': ' + txt : ''), 'error');
+            }
+        }
+        this.showNotification('Cambios guardados', 'success');
+        this.selectedInitials = body.initials;
+        if (!this.selectedPersonId) {
+            // buscar id refrescando lista
+            await this.loadPeople();
+        } else {
+            await this.loadPeople();
+        }
+    }
+
+    async deletePerson() {
+        const baseUrl = (this.config.backendBaseUrl || '').trim();
+        if (!baseUrl) return this.showNotification('Configura Backend Base URL', 'error');
+        const inputInitials = document.getElementById('personInitials').value.trim();
+        const initialsKey = this.selectedInitials || inputInitials;
+        if (!initialsKey) return this.showNotification('Indica iniciales a eliminar', 'error');
+        this.showConfirmModal('Eliminar comensal', '¿Estás seguro de eliminar al comensal y sus comidas?', async () => {
+            const endpoint = this.selectedPersonId ? (`/api/people/id/${this.selectedPersonId}`) : (`/api/people/${encodeURIComponent(initialsKey)}`);
+            const res = await fetch(baseUrl + endpoint, { method: 'DELETE' });
+            if (!res.ok) {
+                const txt = await res.text().catch(() => '');
+                return this.showNotification('Error eliminando comensal' + (txt ? ': ' + txt : ''), 'error');
+            }
+            this.showNotification('Comensal eliminado', 'success');
+            this.selectedInitials = null;
+            this.selectedPersonId = null;
+            this.loadPeople();
+        });
+    }
+
 
     // Métodos de UI
     showLoading(message = 'Procesando...') {

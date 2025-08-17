@@ -9,13 +9,12 @@
     <title>Configuración - Gestión de Comidas</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://apis.google.com/js/api.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
             <h1><i class="fas fa-cog"></i> Configuración</h1>
-            <p>Configuración de Google Sheets para la aplicación de gestión de comidas</p>
+            <p>Configuración del Backend para la aplicación de gestión de comidas</p>
             <div class="header-controls">
                 <a href="index.html" class="btn-secondary">
                     <i class="fas fa-arrow-left"></i> Volver a la aplicación
@@ -24,40 +23,78 @@
         </header>
 
         <div class="main-content">
-            <!-- Formulario de configuración -->
+            <!-- Gestión de comensales (arriba) -->
             <section class="config-section">
-                <h2><i class="fas fa-google"></i> Configuración de Google Sheets</h2>
+                <h2><i class="fas fa-users"></i> Gestión de Comensales</h2>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="personInitials">Iniciales</label>
+                        <input type="text" id="personInitials" placeholder="ABC" maxlength="10">
+                    </div>
+                    <div class="config-item">
+                        <label for="personName">Nombre</label>
+                        <input type="text" id="personName" placeholder="Nombre completo">
+                    </div>
+                    <div class="config-item">
+                        <label for="personResident">Residente</label>
+                        <select id="personResident">
+                            <option value="true">Sí</option>
+                            <option value="false">No</option>
+                        </select>
+                    </div>
+                    <div class="config-item">
+                        <label for="personHasRegimen">Régimen</label>
+                        <select id="personHasRegimen">
+                            <option value="false">No</option>
+                            <option value="true">Sí</option>
+                        </select>
+                    </div>
+                    <div class="config-item">
+                        <label for="personRegimenType">Tipo de Régimen</label>
+                        <input type="text" id="personRegimenType" placeholder="Opcional">
+                    </div>
+                    <div class="config-item" style="grid-column: 1 / -1;">
+                        <label>Listado</label>
+                        <div id="peopleList" style="max-height: 240px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;"></div>
+                    </div>
+                </div>
+                <div class="config-actions">
+                    <button type="button" id="personCreateBtn" class="btn-success"><i class="fas fa-plus"></i> Crear</button>
+                    <button type="button" id="personUpdateBtn" class="btn-primary"><i class="fas fa-save"></i> Guardar cambios</button>
+                    <button type="button" id="personDeleteBtn" class="btn-secondary"><i class="fas fa-trash"></i> Eliminar</button>
+                </div>
+            </section>
+
+            <!-- Formulario de configuración del backend (abajo) -->
+            <section class="config-section">
+                <h2><i class="fas fa-server"></i> Configuración del Backend</h2>
                 
                 <form id="configForm">
                     <div class="config-grid">
                         <div class="config-item">
-                            <label for="googleSheetsId">ID del Google Sheet:</label>
-                            <input type="text" id="googleSheetsId" placeholder="Ej: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms" required>
-                            <small>Encuentra el ID en la URL de tu Google Sheet</small>
+                            <label for="backendBaseUrl">Backend Base URL:</label>
+                            <input type="text" id="backendBaseUrl" placeholder="Ej: http://localhost:4000" required>
+                            <small>URL base del servidor API</small>
                         </div>
                         
                         <div class="config-item">
-                            <label for="sheetName">Nombre de la hoja:</label>
-                            <input type="text" id="sheetName" value="Comidas" placeholder="Nombre de la hoja" required>
-                            <small>Nombre de la pestaña dentro del Google Sheet</small>
+                            <label for="startDate">Fecha de inicio:</label>
+                            <input type="date" id="startDate" value="2025-08-01" required>
+                            <small>Fecha desde la que se planifica (incluida)</small>
                         </div>
                         
                         <div class="config-item">
-                            <label for="apiKey">API Key:</label>
-                            <input type="text" id="apiKey" placeholder="Tu Google API Key" required>
-                            <small>Obtén tu API Key en Google Cloud Console</small>
+                            <label for="daysToGenerate">Días por vista:</label>
+                            <input type="number" id="daysToGenerate" value="120" min="30" max="365">
+                            <small>Cantidad de días a renderizar por bloque</small>
                         </div>
                         
                         <div class="config-item">
-                            <label for="clientId">Client ID (OAuth) o Service Account Email:</label>
-                            <input type="text" id="clientId" placeholder="Tu Google Client ID o Service Account Email">
-                            <small>Para OAuth: Client ID. Para Service Account: Email de la cuenta de servicio</small>
+                            <label for="maxYears">Años máximos:</label>
+                            <input type="number" id="maxYears" value="10" min="1" max="20">
+                            <small>Límite de planificación hacia adelante</small>
                         </div>
-                        <div class="config-item">
-                            <label for="serviceAccountKey">Service Account Key (JSON):</label>
-                            <textarea id="serviceAccountKey" placeholder='Pega aquí el contenido del archivo JSON de la Service Account' rows="5"></textarea>
-                            <small>Opcional: Si usas Service Account, pega aquí el contenido del archivo JSON</small>
-                        </div>
+                        
                     </div>
 
                     <div class="config-actions">
@@ -76,25 +113,24 @@
 
             <!-- Instrucciones -->
             <section class="instructions-section">
-                <h2><i class="fas fa-info-circle"></i> Instrucciones de Configuración</h2>
+                <h2><i class="fas fa-info-circle"></i> Instrucciones</h2>
                 
                 <div class="instructions-grid">
                     <div class="instruction-item">
-                        <h3><i class="fas fa-1"></i> Crear proyecto en Google Cloud Console</h3>
+                        <h3><i class="fas fa-1"></i> Levantar el backend</h3>
                         <ol>
-                            <li>Ve a <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a></li>
-                            <li>Crea un nuevo proyecto o selecciona uno existente</li>
-                            <li>Habilita la "Google Sheets API"</li>
+                            <li>Instala Node.js 18+</li>
+                            <li>Desde la carpeta <code>server/</code>, ejecuta <code>npm install</code> y luego <code>npm run dev</code></li>
+                            <li>El servidor corre en <code>http://localhost:4000</code> por defecto</li>
                         </ol>
                     </div>
                     
                     <div class="instruction-item">
-                        <h3><i class="fas fa-2"></i> Obtener credenciales (OAuth 2.0)</h3>
+                        <h3><i class="fas fa-2"></i> Configurar el frontend</h3>
                         <ol>
-                            <li>Ve a "APIs y servicios" → "Credenciales"</li>
-                            <li>Crea credenciales OAuth 2.0</li>
-                            <li>Configura orígenes autorizados: <code>https://limos-app.github.io</code></li>
-                            <li>Copia el API Key y Client ID</li>
+                            <li>En esta pantalla, coloca el <strong>Backend Base URL</strong> (ej: <code>http://localhost:4000</code>)</li>
+                            <li>Elige la <strong>Fecha de inicio</strong> (por defecto <code>2025-08-01</code>)</li>
+                            <li>Ajusta <strong>Días por vista</strong> y <strong>Años máximos</strong> si es necesario</li>
                         </ol>
                     </div>
                     
@@ -109,12 +145,10 @@
                     </div>
                     
                     <div class="instruction-item">
-                        <h3><i class="fas fa-3"></i> Obtener ID del Google Sheet</h3>
+                        <h3><i class="fas fa-3"></i> Probar conexión</h3>
                         <ol>
-                            <li>Abre tu Google Sheet</li>
-                            <li>Copia el ID de la URL: <code>https://docs.google.com/spreadsheets/d/<strong>ID_AQUI</strong>/edit</code></li>
-                            <li><strong>OAuth 2.0:</strong> Comparte con tu email personal</li>
-                            <li><strong>Service Account:</strong> Comparte con el email de la Service Account</li>
+                            <li>Haz clic en "Probar Conexión"</li>
+                            <li>Si funciona, haz clic en "Guardar Configuración"</li>
                         </ol>
                     </div>
                     
@@ -134,16 +168,20 @@
                 <h2><i class="fas fa-check-circle"></i> Estado de la Configuración</h2>
                 <div id="configStatus" class="status-grid">
                     <div class="status-item">
-                        <span class="status-label">Google Sheets ID:</span>
-                        <span id="statusSheetsId" class="status-value">No configurado</span>
+                        <span class="status-label">Backend:</span>
+                        <span id="statusBackend" class="status-value">No configurado</span>
                     </div>
                     <div class="status-item">
-                        <span class="status-label">API Key:</span>
-                        <span id="statusApiKey" class="status-value">No configurado</span>
+                        <span class="status-label">Fecha inicio:</span>
+                        <span id="statusStartDate" class="status-value">-</span>
                     </div>
                     <div class="status-item">
-                        <span class="status-label">Client ID:</span>
-                        <span id="statusClientId" class="status-value">No configurado</span>
+                        <span class="status-label">Días por vista:</span>
+                        <span id="statusDays" class="status-value">-</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Años máximos:</span>
+                        <span id="statusMaxYears" class="status-value">-</span>
                     </div>
                     <div class="status-item">
                         <span class="status-label">Conexión:</span>

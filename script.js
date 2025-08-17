@@ -8,11 +8,10 @@ class MealManager {
         
         // Cargar configuración desde config.js
         this.config = window.LIMOS_CONFIG || {};
-        this.googleSheetsId = this.config.googleSheetsId || '';
-        this.sheetName = this.config.sheetName || 'Comidas';
-        this.apiKey = this.config.apiKey || '';
-        this.clientId = this.config.clientId || '';
-        this.daysToGenerate = this.config.daysToGenerate || 60;
+        this.backendBaseUrl = this.config.backendBaseUrl || 'http://localhost:4000';
+        this.startDate = this.config.startDate || '2025-08-01';
+        this.daysToGenerate = this.config.daysToGenerate || 120;
+        this.maxYears = this.config.maxYears || 10;
         
         this.init();
     }
@@ -23,6 +22,7 @@ class MealManager {
         await this.loadInitials();
         await this.loadOptions();
         this.renderInitials();
+        this.updateIncompleteBadgesForToday().catch(err => console.warn('Badges init failed', err));
     }
 
     setupEventListeners() {
@@ -34,7 +34,7 @@ class MealManager {
 
         const saveDataBtn = document.getElementById('saveDataBtn');
         if (saveDataBtn) {
-            saveDataBtn.addEventListener('click', () => this.saveToGoogleSheets());
+            saveDataBtn.addEventListener('click', () => this.saveToBackend());
         }
 
         const saveMealsBtn = document.getElementById('saveMealsBtn');
@@ -50,7 +50,12 @@ class MealManager {
         // Botones opcionales - solo agregar si existen
         const testConnectionBtn = document.getElementById('testConnectionBtn');
         if (testConnectionBtn) {
-            testConnectionBtn.addEventListener('click', () => this.testGoogleSheetsConnection());
+            testConnectionBtn.addEventListener('click', () => this.testBackendConnection());
+        }
+
+        const todayBtn = document.getElementById('todayBtn');
+        if (todayBtn) {
+            todayBtn.addEventListener('click', () => this.showTodaySummary());
         }
 
         const previewSheetBtn = document.getElementById('previewSheetBtn');
@@ -59,10 +64,10 @@ class MealManager {
         }
 
         // Configuración - solo agregar si existe
-        const googleSheetId = document.getElementById('googleSheetId');
-        if (googleSheetId) {
-            googleSheetId.addEventListener('input', (e) => {
-                this.googleSheetsId = e.target.value;
+        const backendBaseUrlInput = document.getElementById('backendBaseUrl');
+        if (backendBaseUrlInput) {
+            backendBaseUrlInput.addEventListener('input', (e) => {
+                this.backendBaseUrl = e.target.value;
                 this.saveConfig();
             });
         }
@@ -92,36 +97,44 @@ class MealManager {
 
     async loadInitials() {
         try {
-            console.log('Iniciando carga de iniciales...');
-            this.showLoading('Cargando iniciales...');
-            
-            // En un entorno real, esto sería una llamada a un servidor
-            // Por ahora, simulamos la carga desde el archivo
-            const response = await fetch('iniciales.txt');
-            console.log('Respuesta del fetch:', response.status, response.statusText);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const text = await response.text();
-            console.log('Texto cargado:', text.substring(0, 100) + '...');
-            
-            this.initials = text.split('\n')
-                .filter(line => line.trim())
-                .map(line => {
-                    const [initials, phone] = line.split(',');
-                    return {
-                        initials: initials.trim(),
-                        phone: phone ? phone.trim() : ''
-                    };
-                });
+            console.log('Iniciando carga de personas desde backend...');
+            this.showLoading('Cargando comensales...');
 
-            console.log('Iniciales procesadas:', this.initials.length, 'personas');
-            console.log('Primeras iniciales:', this.initials.slice(0, 3));
+            let ok = false;
+            try {
+                const res = await fetch(this.backendBaseUrl + '/api/people');
+                if (res.ok) {
+                    const people = await res.json();
+                    this.initials = people.map(p => ({
+                        initials: p.initials,
+                        name: p.name,
+                        resident: !!p.resident,
+                        regimen: p.regimen || ''
+                    }));
+                    ok = true;
+                }
+            } catch (e) {
+                console.warn('Fallo backend, usando archivo locales como respaldo', e);
+            }
+
+            if (!ok) {
+                // Respaldo: cargar desde archivo local
+                const response = await fetch('iniciales.txt');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const text = await response.text();
+                this.initials = text.split('\n')
+                    .filter(line => line.trim())
+                    .map(line => {
+                        const [initials, phone] = line.split(',');
+                        return {
+                            initials: initials.trim(),
+                            phone: phone ? phone.trim() : ''
+                        };
+                    });
+            }
 
             this.hideLoading();
-            this.showNotification('Iniciales cargadas correctamente', 'success');
+            this.showNotification('Comensales cargados', 'success');
         } catch (error) {
             this.hideLoading();
             this.showNotification('Error al cargar iniciales', 'error');
@@ -155,25 +168,33 @@ class MealManager {
     }
 
     async loadOptions() {
+        this.showLoading('Cargando opciones...');
         try {
-            this.showLoading('Cargando opciones...');
-            
+            // 1) Intentar backend
+            if (this.backendBaseUrl) {
+                const res = await fetch(this.backendBaseUrl + '/api/options');
+                if (res.ok) {
+                    const arr = await res.json();
+                    if (Array.isArray(arr) && arr.length) {
+                        this.options = arr;
+                        this.hideLoading();
+                        this.showNotification('Opciones cargadas', 'success');
+                        return;
+                    }
+                }
+            }
+            // 2) Intentar archivo local como respaldo
             const response = await fetch('opciones.txt');
             const text = await response.text();
-            
-            this.options = text.split('\n')
-                .filter(line => line.trim())
-                .map(line => line.trim());
-
+            this.options = text.split('\n').filter(line => line.trim()).map(line => line.trim());
             this.hideLoading();
-            this.showNotification('Opciones cargadas correctamente', 'success');
+            this.showNotification('Opciones cargadas', 'success');
         } catch (error) {
             this.hideLoading();
-            this.showNotification('Error al cargar opciones', 'error');
-            console.error('Error loading options:', error);
-            
-            // Opciones por defecto
+            console.warn('Fallo carga de opciones, usando predeterminadas:', error);
+            // 3) Opciones por defecto
             this.options = ['Si', 'Régimen', 'Vianda', 'Temprano', 'Tarde', 'Sandwich', 'No'];
+            this.showNotification('Usando opciones predeterminadas', 'info');
         }
     }
 
@@ -191,40 +212,77 @@ class MealManager {
         
         container.innerHTML = '';
 
-        this.initials.forEach(person => {
+        // Orden personalizado: residentes (A-Z) -> no residentes (A-Z) -> Huesped1, Huesped2 -> Invitados, Plan
+        const normalize = (s) => (s || '').toString().toLowerCase().replace(/\s+/g, '');
+        const computeGroup = (p) => {
+            const norm = normalize(p.initials);
+            if (norm === 'huesped1') return { group: 3, rank: 1 };
+            if (norm === 'huesped2') return { group: 3, rank: 2 };
+            if (norm === 'invitados') return { group: 4, rank: 1 };
+            if (norm === 'plan') return { group: 4, rank: 2 };
+            if (p.resident) return { group: 1, rank: 0 };
+            return { group: 2, rank: 0 };
+        };
+        const displayName = (p) => (p.name && p.name.trim()) || p.initials;
+        const collator = new Intl.Collator('es', { sensitivity: 'base' });
+        const sorted = [...this.initials].sort((a, b) => {
+            const ga = computeGroup(a);
+            const gb = computeGroup(b);
+            if (ga.group !== gb.group) return ga.group - gb.group;
+            if (ga.group === 3 || ga.group === 4) return ga.rank - gb.rank;
+            const comp = collator.compare(displayName(a), displayName(b));
+            if (comp !== 0) return comp;
+            return collator.compare(a.initials, b.initials);
+        });
+
+        sorted.forEach(person => {
             const button = document.createElement('button');
             button.className = 'initial-btn';
             button.textContent = person.initials;
+            button.dataset.initials = person.initials;
             
-            button.addEventListener('click', () => {
-                // Si el botón ya está seleccionado, deseleccionarlo
+            button.addEventListener('click', (ev) => {
                 if (button.classList.contains('selected')) {
                     this.deselectPerson();
                 } else {
-                    this.selectPerson(person);
+                    this.selectPerson(person, ev.currentTarget);
                 }
             });
             container.appendChild(button);
         });
     }
 
-    selectPerson(person) {
+    selectPerson(person, buttonEl) {
         // Deseleccionar botón anterior
         document.querySelectorAll('.initial-btn').forEach(btn => {
             btn.classList.remove('selected');
         });
 
-        // Seleccionar nuevo botón
-        event.target.closest('.initial-btn').classList.add('selected');
+        // Seleccionar nuevo botón y ocultar los demás
+        const clickedBtn = buttonEl;
+        clickedBtn.classList.add('selected');
+        document.querySelectorAll('.initial-btn').forEach(btn => {
+            if (btn !== clickedBtn) {
+                btn.style.display = 'none';
+            }
+        });
 
         this.selectedPerson = person;
-        document.getElementById('selectedPersonName').textContent = person.initials;
         
         // Mostrar sección de comidas
         document.getElementById('mealsSection').style.display = 'block';
         
         // Generar días y comidas
         this.generateMeals();
+
+        // Cargar comidas existentes desde el backend para el rango visible
+        const from = this.startDate;
+        const endDate = new Date(this.startDate);
+        endDate.setDate(endDate.getDate() + this.daysToGenerate - 1);
+        const to = endDate.toISOString().split('T')[0];
+        this.loadMealsFromBackend(from, to, person.initials).catch(err => {
+            console.warn('No se pudo cargar comidas previas:', err);
+        });
         
         // Habilitar botón de guardar
         document.getElementById('saveMealsBtn').disabled = false;
@@ -234,10 +292,11 @@ class MealManager {
         // Deseleccionar todos los botones
         document.querySelectorAll('.initial-btn').forEach(btn => {
             btn.classList.remove('selected');
+            btn.style.display = '';
         });
 
         this.selectedPerson = null;
-        document.getElementById('selectedPersonName').textContent = 'Selecciona un comensal';
+        // No mostramos el nombre seleccionado en la UI de cabecera
         
         // Ocultar sección de comidas
         document.getElementById('mealsSection').style.display = 'none';
@@ -321,7 +380,128 @@ class MealManager {
                 }
                 
                 this.mealsData[this.selectedPerson.initials][date][meal] = option;
+
+                // Guardado local inmediato como respaldo
+                try {
+                    localStorage.setItem('mealsData', JSON.stringify(this.mealsData));
+                } catch {}
+
+                // Guardado automático en backend
+                this.autoSaveSelection(this.selectedPerson.initials, date, meal, option);
+
+                // Actualizar badge del día de hoy si corresponde
+                const todayIso = this.getTodayIso();
+                if (date === todayIso) {
+                    this.updateBadgeForInitials(this.selectedPerson.initials);
+                }
             });
+        });
+    }
+
+    getTodayIso() {
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    async updateIncompleteBadgesForToday() {
+        try {
+            const iso = this.getTodayIso();
+            if (!this.backendBaseUrl) return;
+            const res = await fetch(this.backendBaseUrl + `/api/meals?from=${iso}&to=${iso}`);
+            if (!res.ok) return;
+            const rows = await res.json();
+            const have = {};
+            rows.forEach(r => {
+                if (!have[r.initials]) have[r.initials] = { A: false, C: false };
+                if (r.mealType === 'A') have[r.initials].A = true;
+                if (r.mealType === 'C') have[r.initials].C = true;
+            });
+            // For each resident, show badge if not both
+            this.initials.forEach(p => {
+                if (!p.resident) { this.setBadge(p.initials, false); return; }
+                const status = have[p.initials] || { A: false, C: false };
+                const incomplete = !(status.A && status.C);
+                this.setBadge(p.initials, incomplete);
+            });
+        } catch (e) {
+            console.warn('updateIncompleteBadgesForToday error', e);
+        }
+    }
+
+    updateBadgeForInitials(initials) {
+        const iso = this.getTodayIso();
+        const day = this.mealsData[initials]?.[iso] || {};
+        const complete = !!(day.almuerzo) && !!(day.cena);
+        this.setBadge(initials, !complete);
+    }
+
+    setBadge(initials, show) {
+        const btn = document.querySelector(`.initial-btn[data-initials="${CSS.escape(initials)}"]`);
+        if (!btn) return;
+        let badge = btn.querySelector('.badge-alert');
+        if (show) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'badge-alert';
+                badge.textContent = '!';
+                btn.appendChild(badge);
+            }
+        } else {
+            if (badge && badge.parentNode) badge.parentNode.removeChild(badge);
+        }
+    }
+
+    async autoSaveSelection(initials, date, mealKey, value) {
+        if (!this.backendBaseUrl) {
+            console.warn('Backend Base URL no configurado, se omite guardado remoto');
+            return;
+        }
+        const mealType = mealKey === 'almuerzo' ? 'A' : 'C';
+        const payload = { records: [{ initials, date, mealType, value }] };
+        try {
+            const res = await fetch(this.backendBaseUrl + '/api/meals/bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || ('HTTP ' + res.status));
+            }
+            // No notificación para no saturar; dejar trazas en consola
+            console.debug('Guardado OK', initials, date, mealType, value);
+        } catch (error) {
+            console.error('Error guardando selección:', error);
+            this.showNotification('Error al guardar en servidor. Se guardó localmente.', 'error');
+        }
+    }
+
+    async loadMealsFromBackend(from, to, initials) {
+        if (!this.backendBaseUrl) return;
+        const url = new URL(this.backendBaseUrl + '/api/meals');
+        url.searchParams.set('from', from);
+        url.searchParams.set('to', to);
+        if (initials) url.searchParams.set('initials', initials);
+        const res = await fetch(url.toString());
+        if (!res.ok) return;
+        const rows = await res.json();
+        // Volcar a estructura interna y marcar UI
+        rows.forEach(r => {
+            if (!this.mealsData[r.initials]) this.mealsData[r.initials] = {};
+            if (!this.mealsData[r.initials][r.date]) this.mealsData[r.initials][r.date] = {};
+            const mealKey = r.mealType === 'A' ? 'almuerzo' : 'cena';
+            this.mealsData[r.initials][r.date][mealKey] = r.value;
+            if (this.selectedPerson && this.selectedPerson.initials === r.initials) {
+                const container = document.querySelector(`.meal-options[data-date="${r.date}"][data-meal="${mealKey}"]`);
+                if (container) {
+                    container.querySelectorAll('.meal-option-btn').forEach(b => b.classList.remove('selected'));
+                    const btn = Array.from(container.querySelectorAll('.meal-option-btn')).find(b => b.dataset.option === r.value);
+                    if (btn) btn.classList.add('selected');
+                }
+            }
         });
     }
 
@@ -336,7 +516,7 @@ class MealManager {
         
         this.showNotification('Comidas guardadas localmente', 'success');
         
-        // Habilitar botón de guardar en Google Sheets
+        // Habilitar botón de guardar en servidor
         document.getElementById('saveDataBtn').disabled = false;
     }
 
@@ -359,129 +539,132 @@ class MealManager {
         );
     }
 
-    async saveToGoogleSheets() {
-        if (!this.googleSheetsId) {
-            this.showNotification('Configura el ID de Google Sheet primero', 'error');
+    async saveToBackend() {
+        if (!this.backendBaseUrl) {
+            this.showNotification('Configura el Backend Base URL primero', 'error');
             return;
         }
-
         if (Object.keys(this.mealsData).length === 0) {
             this.showNotification('No hay datos para guardar', 'error');
             return;
         }
-
         try {
-            this.showLoading('Guardando en Google Sheets...');
-            
-            // Preparar datos en el formato correcto para Google Sheets
-            const sheetData = this.prepareSheetData();
-            
-            // Intentar guardar usando la API real
-            await this.saveToGoogleSheetsAPI(sheetData);
-            
+            this.showLoading('Guardando en el servidor...');
+            const payload = this.prepareBackendPayload();
+            const res = await fetch(this.backendBaseUrl + '/api/meals/bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error('Error ' + res.status + ': ' + text);
+            }
             this.hideLoading();
-            this.showNotification('Datos guardados en Google Sheets correctamente', 'success');
+            this.showNotification('Datos guardados en el servidor', 'success');
         } catch (error) {
             this.hideLoading();
-            this.showNotification('Error al guardar en Google Sheets: ' + error.message, 'error');
-            console.error('Error saving to Google Sheets:', error);
+            this.showNotification('Error al guardar: ' + error.message, 'error');
+            console.error('Error saving to backend:', error);
         }
     }
 
-    async saveToGoogleSheetsAPI(sheetData) {
-        // Verificar si tenemos las credenciales necesarias
-        if (!this.hasGoogleSheetsCredentials()) {
-            throw new Error('Credenciales de Google Sheets no configuradas');
-        }
-
-        // Inicializar la API de Google
-        await this.initializeGoogleAPI();
-
-        // Preparar los datos para la API
-        const values = [sheetData.headers, ...sheetData.meals];
-        
-        // Actualizar la hoja
-        const response = await gapi.client.sheets.spreadsheets.values.update({
-            spreadsheetId: this.googleSheetsId,
-            range: `${this.sheetName}!A1`,
-            valueInputOption: 'RAW',
-            resource: {
-                values: values
-            }
-        });
-
-        console.log('Respuesta de Google Sheets:', response);
-        return response;
-    }
-
-    hasGoogleSheetsCredentials() {
-        // Verificar si tenemos las credenciales configuradas
-        // En un entorno real, esto verificaría las credenciales OAuth o Service Account
-        return this.googleSheetsId && this.sheetName;
-    }
-
-    async initializeGoogleAPI() {
-        return new Promise((resolve, reject) => {
-            gapi.load('client:auth2', async () => {
-                try {
-                    const initConfig = {
-                        discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
-                        scope: 'https://www.googleapis.com/auth/spreadsheets'
-                    };
-
-                    // Agregar credenciales si están configuradas
-                    if (this.apiKey) {
-                        initConfig.apiKey = this.apiKey;
-                    }
-                    if (this.clientId) {
-                        initConfig.clientId = this.clientId;
-                    }
-
-                    await gapi.client.init(initConfig);
-
-                    // Si tenemos clientId, intentar autenticar
-                    if (this.clientId && gapi.auth2) {
-                        if (!gapi.auth2.getAuthInstance().isSignedIn.get()) {
-                            await gapi.auth2.getAuthInstance().signIn();
-                        }
-                    }
-
-                    resolve();
-                } catch (error) {
-                    reject(error);
+    prepareBackendPayload() {
+        // Convertir la estructura interna a un arreglo de registros normalizados
+        const records = [];
+        Object.keys(this.mealsData).forEach(initials => {
+            const byDate = this.mealsData[initials];
+            Object.keys(byDate).forEach(dateStr => {
+                const day = byDate[dateStr];
+                if (day.almuerzo) {
+                    records.push({ initials, date: dateStr, mealType: 'A', value: day.almuerzo });
+                }
+                if (day.cena) {
+                    records.push({ initials, date: dateStr, mealType: 'C', value: day.cena });
                 }
             });
         });
+        return { startDate: this.startDate, records };
+    }
+
+    async testBackendConnection() {
+        try {
+            this.showLoading('Probando conexión...');
+            const res = await fetch(this.backendBaseUrl + '/api/health');
+            this.hideLoading();
+            if (res.ok) {
+                this.showNotification('Conexión exitosa con el backend', 'success');
+            } else {
+                this.showNotification('Backend respondió con estado ' + res.status, 'error');
+            }
+        } catch (error) {
+            this.hideLoading();
+            this.showNotification('Error de conexión: ' + error.message, 'error');
+        }
+    }
+
+    async showTodaySummary() {
+        try {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const iso = `${yyyy}-${mm}-${dd}`;
+
+            const res = await fetch(this.backendBaseUrl + `/api/meals?from=${iso}&to=${iso}`);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const rows = await res.json();
+
+            const includeValue = (v) => v && v !== 'No' && v !== 'Vianda';
+            const tagFor = (v) => v === 'Régimen' ? '(R)' : v === 'Temprano' ? '(12)' : v === 'Tarde' ? '(T)' : '';
+
+            const byMeal = { A: [], C: [] };
+            rows.forEach(r => {
+                if (!includeValue(r.value)) return;
+                byMeal[r.mealType] = byMeal[r.mealType] || [];
+                byMeal[r.mealType].push({ initials: r.initials, tag: tagFor(r.value) });
+            });
+
+            const renderList = (arr) => {
+                if (!arr || arr.length === 0) return '<em>Sin anotados</em>';
+                const sorted = arr.slice().sort((a,b) => a.initials.localeCompare(b.initials));
+                return sorted.map(x => `${x.initials}${x.tag ? ' ' + x.tag : ''}`).join(', ');
+            };
+
+            const countA = (byMeal.A || []).length;
+            const countC = (byMeal.C || []).length;
+            const dateStr = today.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+            const content = `
+                <div>
+                    <h4 style="margin-bottom: 10px;">${dateStr}</h4>
+                    <div style="margin-bottom: 12px;"><strong>Almuerzo (${countA})</strong><br/>${renderList(byMeal.A)}</div>
+                    <div><strong>Cena (${countC})</strong><br/>${renderList(byMeal.C)}</div>
+                </div>
+            `;
+
+            this.showPreviewModal('Hoy - Resumen de comensales', content);
+        } catch (err) {
+            console.error('Error mostrando resumen de hoy:', err);
+            this.showNotification('No se pudo cargar el resumen de hoy', 'error');
+        }
     }
 
     prepareSheetData() {
-        const sheetData = {
-            headers: ['Fecha', 'Comida'],
-            meals: []
-        };
-
-        // Agregar iniciales como headers (columna C en adelante)
-        this.initials.forEach(person => {
-            sheetData.headers.push(person.initials);
-        });
-
-        // Generar datos de comidas para los próximos 60 días
-        const today = new Date();
-        
+        // Conservamos esta función para la vista previa local en UI
+        const sheetData = { headers: ['Fecha', 'Comida'], meals: [] };
+        this.initials.forEach(person => { sheetData.headers.push(person.initials); });
+        const today = new Date(this.startDate);
         for (let i = 0; i < this.daysToGenerate; i++) {
             const date = new Date(today);
             date.setDate(today.getDate() + i);
             const dateStr = date.toISOString().split('T')[0];
-            
-            // Fila para Almuerzo
             const almuerzoRow = [dateStr, 'A'];
             this.initials.forEach(person => {
                 const mealData = this.mealsData[person.initials]?.[dateStr]?.almuerzo || '';
                 almuerzoRow.push(mealData);
             });
             sheetData.meals.push(almuerzoRow);
-            
-            // Fila para Cena
             const cenaRow = [dateStr, 'C'];
             this.initials.forEach(person => {
                 const mealData = this.mealsData[person.initials]?.[dateStr]?.cena || '';
@@ -489,7 +672,6 @@ class MealManager {
             });
             sheetData.meals.push(cenaRow);
         }
-
         return sheetData;
     }
 
@@ -507,26 +689,7 @@ class MealManager {
         });
     }
 
-    async testGoogleSheetsConnection() {
-        if (!this.googleSheetsId) {
-            this.showNotification('Ingresa el ID de Google Sheet primero', 'error');
-            return;
-        }
-
-        try {
-            this.showLoading('Probando conexión...');
-            
-            // Aquí iría la lógica real de prueba de conexión
-            await this.simulateConnectionTest();
-            
-            this.hideLoading();
-            this.showNotification('Conexión exitosa con Google Sheets', 'success');
-        } catch (error) {
-            this.hideLoading();
-            this.showNotification('Error de conexión con Google Sheets', 'error');
-            console.error('Connection test error:', error);
-        }
-    }
+    async testGoogleSheetsConnection() {}
 
     showSheetPreview() {
         if (Object.keys(this.mealsData).length === 0) {
